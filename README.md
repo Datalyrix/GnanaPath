@@ -1,6 +1,6 @@
 
 <h3> Graph-based framework for connected-data analytics</h3>
-- updated time Feb8 2021
+- updated time Feb6 2021
 
 The framework allows you to store data into node and edges and creates edges as based on logic you can provide.
 The framework has  visualization of metadata nodes and datanodes.
