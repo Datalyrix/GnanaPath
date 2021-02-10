@@ -1,0 +1,1 @@
+pipenv run spark-submit --master local --py-files dist/gngraph-0.1.0-py3.7.egg jobs/gntestjob.py ~/GnanaPath-pysparkgraph/GnanaPath/gndata/uploads/sample.txt ~/GnanaPath-pysparkgraph/GnanaPath/gndata/gngraphdb/sampleo.file
