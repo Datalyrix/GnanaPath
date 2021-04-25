@@ -11,7 +11,7 @@ import logging
 curentDir = os.getcwd()
 listDir = curentDir.rsplit('/', 1)[0]
 sys.path.append(listDir)
-sys.path.append(listDir + '/gndatadis')
+###sys.path.append(listDir + '/gndatadis')
 
 from gndatadis.gndd_csv_load import gndwdbDataUpload  # to upload Files.
 from gnutils.get_config_file import get_config_neo4j_conninfo_file
@@ -96,7 +96,6 @@ def load_user(user_id):
 
 @app.route('/', methods=['GET'])
 def gn_home():
-    print(' site reached');
     if check_server_session() or request.args.get('disp_srch'):
         _srch = True
     else:
@@ -143,7 +142,7 @@ def neo4j_conn_check_api():
             res = gndwdb_neo4j_conn_check_api(cfg_file, verbose)
             return res
         except:
-            return "Error"   
+            return "Error"
     return "NoFile"
 
 
@@ -289,35 +288,25 @@ def gnsrch_api():
     # Get srchstring and then pass to search func
     if 'srchqry' in request.args:
         srchqry = request.args['srchqry']
-
-        
         gnlogger.info('GNSearch: search qry string:' + srchqry)
-
         # Remove "' begining and end
         srchqry_filtered = dequote(srchqry)
-
         slen = len(srchqry_filtered)
 
         # Let us invoke gnsrch api
-        if (verbose > 3):
-            print('GNPAppServer: search qry : ' + srchqry_filtered)
+        gnlogger.info('GNPAppServer: search qry : ' + srchqry_filtered)
 
         # call gnsearch api
         res = gnsrch_sqlqry_api(srchqry_filtered, verbose)
         res_data = re.sub(r"(\w+):", r'"\1":', res)
-    
-        if (verbose > 4):
-            print('GNPAppSrch:   res : ' + res)
+
+        gnlogger.info('GNPAppSrch:   res : ' + res)
 
         rjson = {
             "status": "SUCCESS",
             "data": res_data
         }
-
-        # return json.JSONDecoder(object_pairs_hook=OrderedDict).decode()
-        return res;
-
-        # return  json.dumps(rjson, indent=4, separators=(',', ': '))
+        return res
 
     else:
         errstr = {
@@ -351,8 +340,7 @@ def gnmetanodes_fetch_api():
         srchqry = dequote(srchqry_raw)
 
         # Let us invoke gnsrch api
-        if (verbose > 3):
-            print('GNPAppServer: search qry for metanodes : ' + srchqry)
+        gnlogger.info('GNPAppServer: search qry for metanodes : ' + srchqry)
     else:
         srchqry = ''
 
@@ -360,9 +348,7 @@ def gnmetanodes_fetch_api():
 
     res = gndwdb_metarepo_nodes_fetch_api(verbose)
     res_data = re.sub(r"(\w+):", r'"\1":', res)
-
-    if (verbose > 4):
-        print('GNPAppServer:   res : ' + res)
+    gnlogger.info('GNPAppServer:   res : ' + res)
 
     rjson = {
         "status": "SUCCESS",
@@ -389,8 +375,7 @@ def gnmetaedges_fetch_api():
         srchqry = dequote(srchqry_raw)
 
         # Let us invoke gnsrch api
-        if (verbose > 3):
-            print('GNPAppServer: search qry for metanodes : ' + srchqry)
+        gnlogger.info('GNPAppServer: search qry for metanodes : ' + srchqry)
 
     else:
         srchqry = ''
@@ -399,9 +384,7 @@ def gnmetaedges_fetch_api():
 
     res = gndwdb_metarepo_edges_fetch_api(srchqry, verbose)
     res_data = re.sub(r"(\w+):", r'"\1":', res)
-
-    if (verbose > 4):
-        print('GNPAppServer:   res : ' + res)
+    gnlogger.info('GNPAppServer:   res : ' + res)
 
     rjson = {
         "status": "SUCCESS",
