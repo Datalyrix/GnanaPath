@@ -4,13 +4,14 @@
 #
 #
 #################################################################
-import os, sys
+import os
+import sys
+import logging
 
 curentDir = os.getcwd()
 listDir = curentDir.rsplit('/', 1)[0]
-#print(' Test listdir: '+listDir)
 sys.path.append(listDir)
-sys.path.append(listDir + '/gndatadis')
+###sys.path.append(listDir + '/gndatadis')
 
 from gndatadis.gndd_csv_load import gndwdbDataUpload  # to upload Files.
 from gnutils.get_config_file import get_config_neo4j_conninfo_file
@@ -29,8 +30,11 @@ import re
 from connect_form import ConnectServerForm, LoginForm
 from collections import OrderedDict
 from gnp_db_ops import ConnectModel
+import gn_config as gnconfig
 
 # Append system path
+
+
 
 
 
@@ -53,14 +57,22 @@ app.config['MAX_CONTENT_LENGTH'] = 256 * 1024 * 1024
 # app.config["JSONIFY_PRETTYPRINT_REGULAR"]=True
 # Get current path
 path = os.getcwd()
+
+app.config["gnRootDir"] = path.rsplit('/', 1)[0]
+
+gnconfig.gn_config_dirs(app)
+gnlogger = gnconfig.gn_logging_init(app, "GNPath")
+
+
 # file Upload
-UPLOAD_FOLDER = os.path.join(path, 'uploads')
+###UPLOAD_FOLDER = os.path.join(path, 'uploads')
+UPLOAD_FOLDER = app.config["gnUploadsFolder"]
 
 # Make directory if uploads is not exists
 if not os.path.isdir(UPLOAD_FOLDER):
     os.mkdir(UPLOAD_FOLDER)
 
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+###app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 # Allowed extension you can set your own
 ALLOWED_EXTENSIONS = set(['csv', 'json', ])
@@ -115,8 +127,8 @@ def upload_file():
             file_name,file_ext=fname.split(".")
             filename= re.sub(r'\W+','',file_name)+f'.{file_ext}'
             print(filename)
-            files.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-            gndwdbDataUpload(app.config['UPLOAD_FOLDER'], filename)
+            files.save(os.path.join(app.config['gnUploadsFolder'], filename))
+            gndwdbDataUpload(app.config['gnUploadsFolder'], filename)
 
         flash(f'File {filename} successfully uploaded', 'success')
         return redirect(url_for('gn_home', disp_srch=_srch))
@@ -130,7 +142,7 @@ def neo4j_conn_check_api():
             res = gndwdb_neo4j_conn_check_api(cfg_file, verbose)
             return res
         except:
-            return "Error"   
+            return "Error"
     return "NoFile"
 
 
@@ -263,7 +275,7 @@ def user_login():
 @login_required
 def gnview_cola_api():
     _srch = True if check_server_session() else False
-    print('GnApp: gnview cola is initiated')
+    gnlogger.info(' gnview cola is initiated')
     return render_template('gnview/gnsrchview.html', disp_srch=_srch)
 
 
@@ -272,39 +284,29 @@ def gnview_cola_api():
 def gnsrch_api():
     verbose = 0
     srchqry = ''
-    print('GNPAppserver: search api ')
+    gnlogger.info('gn search api initiated')
     # Get srchstring and then pass to search func
     if 'srchqry' in request.args:
         srchqry = request.args['srchqry']
-
-        if (verbose > 3):
-            print('GNPAppServer: search qry string:' + srchqry)
-
+        gnlogger.info('GNSearch: search qry string:' + srchqry)
         # Remove "' begining and end
         srchqry_filtered = dequote(srchqry)
-
         slen = len(srchqry_filtered)
 
         # Let us invoke gnsrch api
-        if (verbose > 3):
-            print('GNPAppServer: search qry : ' + srchqry_filtered)
+        gnlogger.info('GNPAppServer: search qry : ' + srchqry_filtered)
 
         # call gnsearch api
         res = gnsrch_sqlqry_api(srchqry_filtered, verbose)
         res_data = re.sub(r"(\w+):", r'"\1":', res)
-    
-        if (verbose > 4):
-            print('GNPAppSrch:   res : ' + res)
+
+        gnlogger.info('GNPAppSrch:   res : ' + res)
 
         rjson = {
             "status": "SUCCESS",
             "data": res_data
         }
-
-        # return json.JSONDecoder(object_pairs_hook=OrderedDict).decode()
-        return res;
-
-        # return  json.dumps(rjson, indent=4, separators=(',', ': '))
+        return res
 
     else:
         errstr = {
@@ -338,8 +340,7 @@ def gnmetanodes_fetch_api():
         srchqry = dequote(srchqry_raw)
 
         # Let us invoke gnsrch api
-        if (verbose > 3):
-            print('GNPAppServer: search qry for metanodes : ' + srchqry)
+        gnlogger.info('GNPAppServer: search qry for metanodes : ' + srchqry)
     else:
         srchqry = ''
 
@@ -347,9 +348,7 @@ def gnmetanodes_fetch_api():
 
     res = gndwdb_metarepo_nodes_fetch_api(verbose)
     res_data = re.sub(r"(\w+):", r'"\1":', res)
-
-    if (verbose > 4):
-        print('GNPAppServer:   res : ' + res)
+    gnlogger.info('GNPAppServer:   res : ' + res)
 
     rjson = {
         "status": "SUCCESS",
@@ -376,8 +375,7 @@ def gnmetaedges_fetch_api():
         srchqry = dequote(srchqry_raw)
 
         # Let us invoke gnsrch api
-        if (verbose > 3):
-            print('GNPAppServer: search qry for metanodes : ' + srchqry)
+        gnlogger.info('GNPAppServer: search qry for metanodes : ' + srchqry)
 
     else:
         srchqry = ''
@@ -386,9 +384,7 @@ def gnmetaedges_fetch_api():
 
     res = gndwdb_metarepo_edges_fetch_api(srchqry, verbose)
     res_data = re.sub(r"(\w+):", r'"\1":', res)
-
-    if (verbose > 4):
-        print('GNPAppServer:   res : ' + res)
+    gnlogger.info('GNPAppServer:   res : ' + res)
 
     rjson = {
         "status": "SUCCESS",
