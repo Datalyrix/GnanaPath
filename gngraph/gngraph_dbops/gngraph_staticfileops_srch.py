@@ -49,14 +49,12 @@ class  GNGraphSrchStaticFileOps:
 
         # First flatten gndatanodeobj
         n1_schema = spk.read.json(baseDataNodeDF.rdd.map(lambda row: row.gndatanodeobj)).schema
-        n1DF = baseDataNodeDF.withColumn("gndatanodeobj", from_json("gndatanodeobj", n1_schema))\
-                             .select(col('gnnodeid'), col('gnnodetype'), col('gnmetanodeid'), col('uptmstmp'), col('gndatanodeobj.*'))
-        # Flatten gndatanodeprop
         n2_schema = spk.read.json(baseDataNodeDF.rdd.map(lambda row: row.gndatanodeprop)).schema
-        n2DF = baseDataNodeDF.withColumn("gndatanodeprop", from_json("gndatanodeprop", n2_schema))\
-                             .select(col('gnnodeid'), col('gndatanodeprop.*'))
 
-        datanodeFlattenDF = n1DF.join(n2DF, n1DF.gnnodeid==n2DF.gnnodeid, "inner")
+        
+        datanodeFlattenDF = baseDataNodeDF.withColumn("gndatanodeobj", from_json("gndatanodeobj", n1_schema)) \
+                          .withColumn("gndatanodeprop", from_json("gndatanodeprop", n2_schema)) \
+                          .select(col("gnnodeid"), col("gnnodetype"), col("gnmetanodeid"), col("gndatanodeobj.*"), col("gndatanodeprop.*"), col("uptmstmp"))
 
         return datanodeFlattenDF
 
@@ -70,14 +68,14 @@ class  GNGraphSrchStaticFileOps:
         retDF = None
         
         if path.exists(dnode_fpath):
-           dnodeDF = spk.read.json(dnode_fpath)
-           dnodeDF.show(1)
+           retDF = spk.read.json(dnode_fpath)
+           retDF.show(1)
            # flatten gndatanodeprop and gndatanodeobj (actual dataset attibutes)
-           retDF = self.datanode_flatten_jsonfields(dnodeDF, spk)
+           dnodeDF = self.datanode_flatten_jsonfields(retDF, spk)
            # also map the node to tempview with nodename
-           retDF.createOrReplaceTempView(node_name)
+           dnodeDF.createOrReplaceTempView(node_name)
            
-        return retDF
+        return dnodeDF
 
 
     def   gnmetaedges_map_df(self, spk):
