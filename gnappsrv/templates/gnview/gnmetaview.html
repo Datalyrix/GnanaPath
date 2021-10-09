@@ -84,10 +84,8 @@
 
                 <a class="nav-item nav-link" href="{{ url_for('connect_server') }}">Connect</a>
                 <a class="nav-item nav-link" href="{{ url_for('upload_file') }}">Upload</a>
-                {% if disp_srch %}
                 <a class="nav-item nav-link" href="{{ url_for('gnview_cola_api') }}">Searchview</a>
                 <a class="nav-item nav-link" href="{{ url_for('gnmetaview_cola_api') }}">Metaview</a>
-                {% endif %}
                 <a class="nav-item nav-link" href="{{ url_for('logout') }}">Logout</a>
 
                 {% else %}
@@ -110,14 +108,21 @@
 
   <div class="cytools">
 
-    <h5>Search Panel</h5>
+    <h5>Meta Nodes Search Panel</h5>
     <p>You can search specific meta node or associations Example: Enter cusotmer  </p>
     <input id="srchid" type="text" />
     <button id="srchbtn">Search</button>
     <label id="statuslbl"></label>
     <label id="errorlbl" style="color:red"></label>
     <hr>
-    
+    <h6> Meta Nodes </h6>
+    <p>
+     <h6> Select Node Information </h6> 
+    <label id="selnodename"></label>
+    <label id="selnodeid"></label>
+    <label id="selnodetype"></label>
+    </p>
+    <hr>
    <!-- <h6>Zoom View</h6>
 
       <div class="slidecontainer">

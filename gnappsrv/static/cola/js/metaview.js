@@ -44,7 +44,7 @@
     }
       
     let applyDatasetFromSelect = () => 
-          Promise.resolve( $dataset ).then( getGnDataset ).then( applyDataset );
+        Promise.resolve( $dataset ).then( getGnDataset ).then( applyDataset ).then(setNodesMethod);
 
     ///let applyDatasetFromSelect = () => 
 	///Promise.resolve( $dataset).then( getGnDataSet().then(
@@ -158,6 +158,16 @@
        //// zoom options	  
       });
 
+     ///cy.nodes().forEach(function(n) {
+	///  var g = n.data('nodename');
+
+	  ///n.on('click', function(e) {
+	  ///    console.log(' Node select '+g)
+	  ///});
+      ///});
+
+
+      
       tryPromise( applyDatasetFromSelect ).then( applyStylesheetFromSelect ).then( applyLayoutFromSelect );
 
       let applyDatasetChange = () => tryPromise(applyDatasetFromSelect).then(applyStylesheetFromSelect).then(applyLayoutFromSelect);
@@ -190,6 +200,8 @@
 	    'Access-Control-Allow-Origin' : '*'
 	});
 	
+	stlbl.innerHTML = "Loading data ";
+	    
 	///console.log('GNView: Fetch data1 ');
 	try {
    	   return fetch(edges_url, { method: 'GET', headers: myHeaders })
@@ -197,12 +209,12 @@
 	
             .then (response => response.json())
             .then (data => {
-             //console.log('GNView: Fetch complete ');
-		//console.log('GNView: data:'+JSON.stringify(data, null,3));
+                console.log('GNView: Fetch complete ');
+	        /////console.log('GNView: data  nodes :'+JSON.stringify(data.gndata.nodes, null,3));
 		var status = data.status;
 		var statusmsg = data.statusmsg;
-		var nodelen = data.nodes.length;
-
+		
+		var nodelen = data.gndata.nodes.length;
 
 		if (status == "ERROR") {
                     console.log('GNView: Error status ');
@@ -215,20 +227,21 @@
 		nodes = '';	      
 		///s = '{'+"\n";
 		//nodes += ' '+"\n";
-		console.log('GNView: fetch complete len:'+nodelen);
+		////console.log('GNView: fetch complete len:'+nodelen);
 		for (i=0; i < nodelen; i++) {
 		    
                     if ( i > 0)
 			nodes += ","+"\n";
 		    
                     nodes += '{';
-		    n = data.nodes[i];
+		    n = data.gndata.nodes[i];
                     nodes += '"data": {';
                     var idint = parseInt(n.id);
                     ///console.log('GNView node-'+i+' id '+n.id);
                     nodes+= '"id": "n'+n.id+'", ';
 		    nodes+= '"idInt": '+(idint)+',';
-		    nodes+= '"name": "'+n.name+'", ';
+		    nodes+= '"name": "'+n.nodename+'", ';
+		    nodes+= '"type": "'+n.nodetype+'", ';
 		    nodes+= '"query": true ';
                     nodes+= '},'+"\n";
 		    nodes+= '"group" : "nodes",'+"\n";
@@ -244,7 +257,7 @@
 		////////// Get edges 
 		//console.log('GNView: Fetch Edges complete ');
 		//console.log('GNView: data:'+JSON.stringify(data, null,3));
-		var nodelen = data.edges.length;
+		var nodelen = data.gndata.edges.length;
 		
 		edges = '';
 		
@@ -256,18 +269,18 @@
 			edges += ",";
 		    
 		    edges += '{';
-		    e = data.edges[i];
+		    e = data.gndata.edges[i];
 	            edges += '"data": {';
 		    var idint = parseInt(e.id);
-		    ///console.log('GNView node-'+i+' id '+n.id);
+		    ////console.log('GNView node-'+i+' id '+n.id);
 		    edges += '"id": "e'+e.id+'", ';
 		    edges += '"idInt": '+(idint)+',';
 		    edges += '"relname": "'+(e.type)+'" ,';
 		    edges += '"source": "n'+e.source+'" ,';
 		    edges += '"target": "n'+e.target+'" ,';
 		    edges += '"directed": true ';
-		    //edges += '"name": "'+n.name+'", ';
-		    //edges += '"query": true ';
+		    ////edges += '"name": "'+n.name+'", ';
+		    ////edges += '"query": true ';
 		    edges += '},'+"\n";
 		    
                     edges += '"position": {},';
@@ -291,10 +304,11 @@
 		s += '\n';
 		s += ']'+"\n";
 		////s += '}'+"\n";
-		console.log('GNView nodes & edges:  '+s);
+		///console.log('GNView nodes1 & edges:  '+s);
 		gn_elements = JSON.parse(s);
 		//gn_elements  = s;
 		console.log('GnanaMetaView: fetch process is completed');
+		stlbl.innerHTML = "Data Upload Complete";
 		return (gn_elements);
 		////////////////////////////////
 		
@@ -302,13 +316,33 @@
 	} catch(error) {
 	    console.log('Error caught '+error);
 	}
-	
+	stlbl.innerHTML = "Data Upload Complete";
     }
+
+    function setNodesMethod() {  
+	cy.nodes().forEach(function(n) {
+            var g = n.data('nodename');
+
+            n.on('click', function(e) {
+		var id = e.cyTarget.id();
+		var ndata = e.cyTarget.data();
+		var selnode_name = document.getElementById('selnodename');
+		var selnode_id = document.getElementById('selnodeid');
+		var selnode_type = document.getElementById('selnodetype');
+		console.log(' Node select '+id);
+		console.log(' Node data '+ndata);
+		selnode_name.innerHTML = ndata.name;
+		selnode_id.innerHTML = ndata.id;
+		selnode_type.innerHTML = ndata.type;
+            });
+	});
+    }
+      
       ///////////////Zooming
       var zx, zy;
-/////// Disable nodespace for timebeing
- //// $('#gnnodespaceid').addEventListener('change', applyNodeSpaceChange);
- /// $('#gnzoomid').addEventListener('change', applyZoomLevelChange);
+      /////// Disable nodespace for timebeing
+      //// $('#gnnodespaceid').addEventListener('change', applyNodeSpaceChange);
+      /// $('#gnzoomid').addEventListener('change', applyZoomLevelChange);
 
   function calculateZoomCenterPoint(){
             var pan = cy.pan();

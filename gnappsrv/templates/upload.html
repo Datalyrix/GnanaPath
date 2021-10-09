@@ -1,22 +1,103 @@
 {% extends "base_layout.html" %}
 {% block content %}
-
-<form class="md-form" method="post" action="" enctype="multipart/form-data">
-<div class="input-group">
-  <div class="custom-file">
-  <input type="file" class="custom-file-input" name="fd" id="inputGroupFile01"  autocomplete="off" required aria-describedby="inputGroupFileAddon01">
-    <label class="custom-file-label" for="inputGroupFile01">Choose a CSV or JSON file</label>
+<div class="content-section">
+  <form class="md-form" method="post" action="" enctype="multipart/form-data">
+   <div class="input-group">
+      <div class="custom-file">
+         <input type="file" class="custom-file-input" name="fd" id="inputGroupFile01"  autocomplete="off" required aria-describedby="inputGroupFileAddon01">
+         <label class="custom-file-label" for="inputGroupFile01">Choose a CSV or JSON file</label>
+      </div>
+  
+    <div class="row">&nbsp;
+      <div class="col-md-12">
+      </div>
    </div>
-   <div class="row">&nbsp;
-   <div class="col-md-12">
- </div></div>
-<div class="input-group-prepend">
-   <button type="submit" class="btn btn-primary">Upload</button>
+<!--   
+     <br>
+   <hr>
+    <div class="input-group-prepend">
+        <button type="submit" class="btn btn-primary">Upload</button>
     </div>
+ -->
 
 </div>
+ <hr/>
+    <div class="p-2">
+      <label> File Description </label>
+      <input type="text" name="fdesc" id="fdesc"></input>
+    </div>
+    <div class="p-2">
+      <label> File type </label>
+      <select name="ftype" id="ftype">
+	<option value="csv">CSV</option>
+	<option value="json">JSON</option>
+      </select>
+    </div>
+    <div class="p-2">
+      <label> File Delimiter (applied for CSV-files only </label>
+      <select name="fdelim" id="fdelim">
+        <option value=","> ","(Comma-seperated)</option>
+        <option value="|">"|" (Pipe-seperated)</option>
+      </select>
+    </div>
 
-</form>
+
+    
+  <br>
+   <hr>
+    <div class="input-group-prepend">
+        <button type="submit" class="btn btn-primary">Upload</button>
+    </div>
+
+   
+ </form>
+</div>
+<div class="w-auto p-3" style="font-size:10px">
+  <form method="POST" action="">
+    <h6> Uploaded Files </h6>
+
+   
+    <table style="margin-left: 20px;font-size: 14px;border:1px">
+      <th>
+        <tr>
+	  <td> fileid </td>
+	  <td> filename </td>
+	  <td> filetype </td>
+	  <td> filedesc </td>
+	  <td> filesize </td>
+	  <td> Action </td>
+	</tr>
+      </th>	
+      
+        {% for i in range(0, flen) %}
+        <tr>
+          <td>
+	    {{ file_res[i].flid }}
+          </td>
+	  <td>
+	    {{ file_res[i].filename }}
+	  </td>
+	  <td>
+	    {{ file_res[i].fieltype }}
+	  </td>
+	  <td>
+	    {{ file_res[i].filedesc }}
+	  </td>
+	  <td>
+	    {{ file_res[i].filesize }}
+	  </td>
+	  <td>
+ 	    {{ file_res[i].state }}
+	  </td>
+	</tr>
+	
+	{% endfor %} 
+    </table>
+    
+  </form>
+</div>
+
+ 
 <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
 <script type="application/javascript">
  $('input[type="file"]').change(function(e){
