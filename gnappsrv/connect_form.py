@@ -5,7 +5,7 @@ import re
 
 
 class ConnectServerForm(FlaskForm):
-    serverIP = StringField('Neo4j server IP : Port',
+    serverIP = StringField('Graph DB server IP : Port',
                            validators=[DataRequired()])
     username = StringField('Username',
                            validators=[DataRequired()])
