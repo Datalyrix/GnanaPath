@@ -41,7 +41,7 @@ class  GNGraphSrchStaticFileOps:
        sqlstr = "SELECT * FROM gnmetanodes where gnnodename='"+node+"'"
        print('get_metanode_info:  sqlstr '+sqlstr)
        nodeEnt = spk.sql(sqlstr)
-       nodeEnt.show()
+       ##nodeEnt.show()
        jobj = json.loads(nodeEnt.toJSON().first())       
        return jobj
                        
@@ -69,7 +69,7 @@ class  GNGraphSrchStaticFileOps:
         
         if path.exists(dnode_fpath):
            retDF = spk.read.json(dnode_fpath)
-           retDF.show(1)
+           ##retDF.show(1)
            # flatten gndatanodeprop and gndatanodeobj (actual dataset attibutes)
            dnodeDF = self.datanode_flatten_jsonfields(retDF, spk)
            # also map the node to tempview with nodename
@@ -87,7 +87,7 @@ class  GNGraphSrchStaticFileOps:
         retDF = None
         if path.exists(edge_fpath):
            metaEdgeDF = spk.read.json(edge_fpath)
-           metaEdgeDF.show(1)
+           ####metaEdgeDF.show(1)
            # flatten gnedgeprop  (actual dataset attibutes)
            edge_schema = spk.read.json(metaEdgeDF.rdd.map(lambda row: row.gnedgeprop)).schema
            self.__gnmetaEdgeDF = metaEdgeDF.withColumn("gnedgeprop", from_json("gnedgeprop", edge_schema)).select(col('gnedgeid'), col('gnedgename'), col('gnedgetype'), col('gnsrcnodeid'), col('gntgtnodeid'),  col('gnedgeprop.*'))
@@ -107,7 +107,7 @@ class  GNGraphSrchStaticFileOps:
         retDF = None
         if path.exists(mnodes_fpath):
            metaNodeDF = spk.read.json(mnodes_fpath)
-           metaNodeDF.show(1)
+           ##metaNodeDF.show(1)
            # flatten gnedgeprop  (actual dataset attibutes)
            mnode_schema = spk.read.json(metaNodeDF.rdd.map(lambda row: row.gnnodeprop)).schema
            self.__gnmetaNodeDF = metaNodeDF.withColumn("gnnodeprop", from_json("gnnodeprop", mnode_schema)).select(col('gnnodeid'), col('gnnodename'), col('gnnodetype'), col('gnnodeprop.*'))
@@ -116,5 +116,16 @@ class  GNGraphSrchStaticFileOps:
            self.__gnmetaNodeDF.createOrReplaceTempView("gnmetanodes")
         return self.__gnmetaNodeDF
 
+    def  get_bizrule_metainfo(self, bizrid, spk):
+
+       if spk is None:
+          print('GNPgresSrchOps: spark is none ')
+
+       sqlstr = "SELECT * FROM gnbizrules where gnrelid='"+bizrid+"'"
+       print('GNPgresSrchOps: get_bizrule_metainfo:  sqlstr '+sqlstr)
+       bizrEnt = spk.sql(sqlstr)
+       #bizrEnt.show()
+       jobj = json.loads(bizrEnt.toJSON().first())
+       return jobj
 
 
