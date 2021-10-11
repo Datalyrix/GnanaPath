@@ -1,4 +1,5 @@
 import os
+from os import path
 import sys
 import numpy as np
 import pandas as pd
@@ -26,7 +27,7 @@ print(rtDir)
 import gnappsrv.gn_config as gnconfig
 
 
-   
+
 def    similarColumnsCheck_fn(df1, df2, df1name, df2name, rfp, fp):
     
    df1size = len(df1)
@@ -189,7 +190,7 @@ def      gndd_columnjoin_discovery_api(fp1, fp2, tgtfolder):
     scol_list = similarColumnsCheck_fn(f1_pdf, f2_pdf, f1name, f2name, resfp, logfp)
     resfp.close()
     logfp.close()
-        
+
 if __name__ == "__main__":
     
      
@@ -201,7 +202,7 @@ if __name__ == "__main__":
      
      tgtfolder = gnconfig.GN_DATA_DISCOVER_FOLDER
      gndd_columnjoin_discovery_api(sfile, cfile, tgtfolder)
-   
+
         
-     
+
     
