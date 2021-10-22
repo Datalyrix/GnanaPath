@@ -65,7 +65,7 @@ class       GNGraphSrchPgresDBOps:
                            .option("password", self.__gdb_dbpasswd) \
                            .option("driver", "org.postgresql.Driver") \
                            .load()
-                retDF.show(2)
+                ###retDF.show(2)
                 dnodeDF = self.datanode_flatten_jsonfields(retDF, spk)
                 
                 retDF.createOrReplaceTempView(tbl_name)
@@ -87,8 +87,8 @@ class       GNGraphSrchPgresDBOps:
             metanode_tbl = self.__gdb_metadb_schema+"."+self.__gdb_metanodes_tbl            
             datadb_connstr = "jdbc:postgresql://"+self.__gdb_dbserver+":"+self.__gdb_dbport+"/"+self.__gdb_datadb
 
-            print('GNPgresSrchOps:    metadbconnstr '+metadb_connstr)
-            print('GNPgresSrchOps:    metanode_tbl '+metanode_tbl)
+            ##print('GNPgresSrchOps:    metadbconnstr '+metadb_connstr)
+            ##print('GNPgresSrchOps:    metanode_tbl '+metanode_tbl)
             
             try:   
                 self.__gnmetaNodeDF = spk.read \
@@ -99,7 +99,7 @@ class       GNGraphSrchPgresDBOps:
                                        .option("password", self.__gdb_dbpasswd) \
                                        .option("driver", "org.postgresql.Driver") \
                                        .load()
-                self.__gnmetaNodeDF.show(2)
+                ####self.__gnmetaNodeDF.show(2)
                 self.__gnmetaNodeDF.createOrReplaceTempView("gnmetanodes")
                 print('GNPgresSrchOps: mapped dataframe COMPLETED ');
             except Exception as error :
@@ -125,7 +125,7 @@ class       GNGraphSrchPgresDBOps:
                                     .option("password", self.__gdb_dbpasswd) \
                                     .option("driver", "org.postgresql.Driver") \
                                     .load()
-                metaEdgeDF.show(2)
+                ###metaEdgeDF.show(2)
                 # also flatten json objects
                 print('GNPgressSrchOps: metaedgeDF mapped ')
                 edge_schema = spk.read.json(metaEdgeDF.rdd.map(lambda row: row.gnedgeprop)).schema
@@ -161,7 +161,7 @@ class       GNGraphSrchPgresDBOps:
                                     .option("password", self.__gdb_dbpasswd) \
                                     .option("driver", "org.postgresql.Driver") \
                                     .load()
-                metaNodeDF.show(2)
+                ####metaNodeDF.show(2)
                 print('GNPgressSrchOps: metaNodeDF mapped ')
                 # also flatten json objects
 
@@ -188,7 +188,7 @@ class       GNGraphSrchPgresDBOps:
        sqlstr = "SELECT * FROM gnmetanodes where gnnodename='"+node+"'"
        print('GNPgresSrchOps: get_metanode_info:  sqlstr '+sqlstr)
        nodeEnt = spk.sql(sqlstr)
-       nodeEnt.show()
+       ###nodeEnt.show()
        jobj = json.loads(nodeEnt.toJSON().first())
        return jobj
 
@@ -206,7 +206,7 @@ class       GNGraphSrchPgresDBOps:
         
 
         print('GNPgresDBSrchOps: Flatten dataframe for JSON Objects')
-        datanodeFlattenDF.show(2)
+        ###datanodeFlattenDF.show(2)
         #n1DF = baseDataNodeDF.withColumn("gndatanodeobj", from_json("gndatanodeobj", n1_schema))\
         #                     .select(col('gnnodeid'), col('gnnodetype'), col('gnmetanodeid'), col('uptmstmp'), col('gndatanodeobj.*'))
         # Flatten gndatanodeprop
@@ -232,7 +232,7 @@ class       GNGraphSrchPgresDBOps:
         
         retDF = None
         if dnodeDF is not None:
-           dnodeDF.show(1)
+           ###dnodeDF.show(1)
            # flatten gndatanodeprop and gndatanodeobj (actual dataset attibutes)
            retDF = self.datanode_flatten_jsonfields(dnodeDF, spk)
            # also map the node to tempview with nodename
@@ -241,3 +241,15 @@ class       GNGraphSrchPgresDBOps:
         return retDF
 
     
+    def  get_bizrule_metainfo(self, bizrid, spk):
+
+       if spk is None:
+          print('GNPgresSrchOps: spark is none ')
+
+       sqlstr = "SELECT * FROM gnbizrules where gnrelid='"+bizrid+"'"
+       print('GNPgresSrchOps: get_bizrule_metainfo:  sqlstr '+sqlstr)
+       bizrEnt = spk.sql(sqlstr)
+       #bizrEnt.show()
+       jobj = json.loads(bizrEnt.toJSON().first())
+       return jobj
+

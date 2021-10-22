@@ -195,8 +195,13 @@
         var errlbl = document.getElementById('selerrorlbl');
 	///var hdrlbl = document.getElementById('gnhdr_lbl');
 
-        if (gnnode_sel == "select")
+	 
+	
+        if (gnnode_sel == "select") {
 	    srchstr = "";
+	    s = {};
+	    return(s) ;
+	}
         else
 	    srchstr = "SELECT * from "+gnnode_sel;
 	
@@ -224,7 +229,8 @@
 		//console.log('GNView: data:'+JSON.stringify(data, null,3));
 		var status = data.status;
 		var statusmsg = data.statusmsg;
-		var nodelen = data.nodes.length;
+		var gndata = data.gndata;
+		var nodelen = gndata.nodes.length;
 
 
 		if (status == "ERROR") {
@@ -247,13 +253,13 @@
 			nodes += ","+"\n";
 		    
                     nodes += '{';
-		    n = data.nodes[i];
+		    n = gndata.nodes[i];
                     nodes += '"data": {';
                     var idint = parseInt(n.id);
                     ///console.log('GNView node-'+i+' id '+n.id);
                     nodes+= '"id": "n'+n.id+'", ';
 		    nodes+= '"idInt": '+(idint)+',';
-		    nodes+= '"name": "'+n.name+'", ';
+		    nodes+= '"name": "'+n.nodename+'", ';
 		    nodes+= '"query": true ';
                     nodes+= '},'+"\n";
 		    nodes+= '"group" : "nodes",';
@@ -274,8 +280,8 @@
 		var nodelen;
 		edges = '';
 		
-		if (data.edges)
-		    nodelen = data.edges.length;
+		if (gndata.edges)
+		    nodelen = gndata.edges.length;
 		else
 		    nodelen = 0;
 		
@@ -288,7 +294,7 @@
 			edges += ","+"\n";
 		    
 		    edges += '{';
-		    e = data.edges[i];
+		    e = gndata.edges[i];
 	            edges += '"data": {';
 		    var idint = parseInt(e.id);
 		    ///console.log('GNView node-'+i+' id '+n.id);
@@ -369,16 +375,16 @@
 		    ///gnnode_selid.empty();
 		    ///$("#gnnode_selid").empty();
 		    ///$("#gnnode_selid").html("");
-		    nodelen = data.nodes.length;
+		    nodelen = data.gndata.nodes.length;
 		    for (i=0; i < nodelen; i++) {
-                        n = data.nodes[i];
-			if (n.type == "TableMetaNode") {
+                        n = data.gndata.nodes[i];
+			if (n.nodetype == "GNMetaNode") {
                             /// Add to select options
-			    console.log('gnmetaview: adding node '+n.name);
+			    console.log('gnmetaview: adding node '+n.nodename);
                             ///gnnode_selid.append($("<option></option>").attr("value", n.name).text(n.value));
 			    //$('#gnnode_selid').append("<option>" + n.name + "</option>");
 			    var c = document.createElement("option");
-			    c.text = n.name;
+			    c.text = n.nodename;
 			    gnnode_selid.options.add(c,1);
 			}
 		    }
@@ -388,8 +394,6 @@
             hdrlbl.innerHTML = 'Network error fetching data';
             console.log('Error caught '+error);
         }
-
-	
 
 
     }

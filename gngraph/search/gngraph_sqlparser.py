@@ -15,23 +15,39 @@ from moz_sql_parser import parse
 import os,sys
 curentDir = os.getcwd()
 parentDir = curentDir.rsplit('/', 1)[0]
+print(parentDir)
+rootDir = parentDir.rsplit('/', 1)[0]
+print(rootDir)
 if parentDir not in sys.path:
     sys.path.append(parentDir)
-
-from config.gngraph_config import GNGraphConfig
-from gngraph_dbops.gngraph_pgresdbops_srch import GNGraphSrchPgresDBOps
-from gngraph_dbops.gngraph_staticfileops_srch import GNGraphSrchStaticFileOps
-
-
-
-class     GNgraphSqlParserOps:
+if rootDir not in sys.path:
+    sys.path.append(rootDir)
+    
+from gngraph.config.gngraph_config import GNGraphConfig
+from gngraph.gngraph_dbops.gngraph_pgresdbops_srch import GNGraphSrchPgresDBOps
+from gngraph.gngraph_dbops.gngraph_staticfileops_srch import GNGraphSrchStaticFileOps
 
 
-    def    __init__(self):
 
+class     GNGraphSqlParserOps:
+
+
+    def    __init__(self, sql_stmt):
         self.__parser_info="moz-sql-parser"
+        self.__sql_stmt = sql_stmt
+        self.__sql_parsed_obj = parse(sql_stmt)
+        print('GNSqlParser: ')
+        print(self.__sql_parsed_obj)
+        self.__entlist = None
+        self.__alias_entlist = None
+        self.__from_str = None
+        self.gn_sqlp_from_processing(self.__sql_parsed_obj['from'])
+        self.__select_ent_list = self.gn_sqlp_select_processing(self.__sql_parsed_obj.get('select'))                              
+               
+    def get_entlist(self):
+        return self.__entlist
 
-
+    
     def listwrap(self, value):
          if value is None:
                return []
@@ -46,34 +62,27 @@ class     GNgraphSqlParserOps:
         frm_str=''
         ceq = cond_str.get('eq')
         if  ceq is not None:
-            print(ceq)
             frm_str += ""+str(ceq[0])+"="+str(ceq[1])+" "
         
         cgt = cond_str.get('gt')
         if  cgt is not None:
-            print(cgt)
             frm_str += ""+str(cgt[0])+">"+str(cgt[1])+" "
                 
         cgte = cond_str.get('gte')
         if  cgte is not None:
-            print(cgte)
             frm_str += ""+str(cgte[0])+">="+str(cgte[1])+" "
                
         clt = cond_str.get('lt')
         if  clt is not None:
-            print(clt)
             frm_str += ""+str(clt[0])+">"+str(clt[1])+" "
                 
         clte = cond_str.get('lte')
         if  clte is not None:
-            print(clte)
             frm_str += ""+str(clte[0])+">="+str(clte[1])+" "
         return frm_str            
 
     
     def      convert_logicalop_conditions(self, osc):
-          print('----- conv_condop start-- ')
-          print(osc)
           astr = ""
           o_and = osc.get('and')
           o_or = osc.get('or')
@@ -104,7 +113,12 @@ class     GNgraphSqlParserOps:
         selobj_list = self.listwrap(sel_obj)
         entlist=[]   
     
-        for sobj in selobj_list: 
+        for sobj in selobj_list:
+            
+            if isinstance(sobj, str):
+               entlist.append(sobj)
+               continue
+               
             x=self.listwrap(sobj.get("value"))    
             if (len(x)>0):
                 #c=listwrap(f.get('name'))
@@ -116,9 +130,6 @@ class     GNgraphSqlParserOps:
 
     def      process_join_stmt(self, f, join_type):
        
-            print(' Processing Join Statement join type '+join_type)
-            #print(f)
-            #frm_str += " inner join"
             entlist = []
             aentlist = []
             frm_str = " "+join_type
@@ -135,9 +146,6 @@ class     GNgraphSqlParserOps:
             ## check on
             on_s = self.listwrap(f.get('on'))
             if (len(on_s) > 0):
-                print('ON Processing   '+str(len(on_s)))
-                print(on_s)   
-               
                 rstr = self.convert_logicalop_conditions(on_s[0])
                 frm_str += " ON "+rstr
                 print('----------------') 
@@ -152,11 +160,21 @@ class     GNgraphSqlParserOps:
       frm_str="from"
       entlist=[]
       aentlist=[]
-    
-      for f in self.listwrap(from_obj):
+         
+      ##frm_obj = self.__sql_parsed_obj['from']
+
+      
+      frm_list = self.listwrap(from_obj)
+      print('GnSqlParsers: frm list ')
+      print(frm_list)
+      for f in frm_list:
+
+        if isinstance(f, str):
+            entlist.append(f)
+            frm_str += " "+f
+            continue
+            
         # first check entities
-        print('Process new From Obj')
-        print(f)
         x=self.listwrap(f.get("value"))    
         if (len(x)>0):
             c=self.listwrap(f.get('name'))
@@ -190,11 +208,33 @@ class     GNgraphSqlParserOps:
             entlist = entlist+elist
             aentlist = aentlist+alist
             
-            
+      self.__entlist = entlist
+      self.__alias_entlist = aentlist
+      self.__from_str = frm_str
 
-      return (entlist, aentlist, frm_str)
+      return (self.__entlist, self.__alias_entlist, self.__from_str)
 
+    def get_entlist(self):
+        return self.__entlist
 
+    def get_entlist_alias(self):
+        return self.__alias_entlist
+    def get_from_str(self):
+        if (self.__from_str):
+            return self.__from_str
+        else:
+            self.gn_sqlp_from_processing(self.__sql_parsed_obj.get('from'))
+            return self.__from_str
+        
+    def get_where_str(self):
+        key="where"
+        if (key in self.__sql_parsed_obj):
+            where_obj = self.__sql_parsed_obj['where']
+            return self.gn_sqlp_where_processing(where_obj)
+        else:
+            where_str = ""
+            return where_str
+    
     def      gn_sqlp_where_processing(self, where_obj):
 
         where_str="where"
@@ -206,22 +246,47 @@ class     GNgraphSqlParserOps:
        
         return where_str
 
+    def  gn_sqlp_reformat_qry(self):
 
+        selstr = ''
+        selent_list = self.__select_ent_list
+        ## prepare original SQL
+        if (self.__alias_entlist[0] is not None):
+           nodeid_sel = self.__alias_entlist[0]+"."+"gnnodeid"
+        else:
+           nodeid_sel = "gnnodeid"
+
+        selent_list.append(nodeid_sel)
+        selstr = 'select'
+        first_flag = 0
+        for s in selent_list:
+          if (first_flag > 0):
+              selstr += ","
+          selstr += " "+s
+          first_flag+=1
+
+        self.__reformatted_sql = selstr
+        return selstr
+    
 
 def        gn_srch_sqlp_api(sqlst):
 
-
-    gn_sqlp_cls = GNgraphSqlParserOps()
+    gn_sqlp_cls = GNGraphSqlParserOps(sqlst)
     
     iSQL_List = parse(sqlst)
+    #iSQL_List = gn_sqlp_cls.__sql_parsed_obj
+    
     sel_obj = iSQL_List.get('select')
     selent_list = gn_sqlp_cls.gn_sqlp_select_processing(sel_obj)
     print('----------- select Processing done----')
     print(selent_list)
     print('--------------------------------------')
-    from_obj = iSQL_List.get('from')
-    (entlist, ent_alias_list, frm_str) = gn_sqlp_cls.gn_sqlp_from_processing(from_obj)                
-    print('----------from Processing done----')        
+    #from_obj = iSQL_List.get('from')
+    #(entlist, ent_alias_list, frm_str) = gn_sqlp_cls.gn_sqlp_from_processing(from_obj)                
+    #print('----------from Processing done----')
+    entlist = gn_sqlp_cls.get_entlist()
+    ent_alias_list = gn_sqlp_cls.get_entlist_alias()
+    frm_str = gn_sqlp_cls.get_from_str()
     print(entlist)
     print(ent_alias_list)
     print(frm_str)      

@@ -23,8 +23,8 @@ class  GNGraphStaticFileOps:
             self.gnedge_table = "gnedges"
             self.gnmetanode_filepath = self.gndata_graph_data_folder+"/"+"gnmetanodes.json"
             self.gnmetaedge_filepath = self.gndata_graph_data_folder+"/"+"gnmetaedges.json"
-
-
+            self.gnmetabizrules_filepath = self.gndata_graph_data_folder+"/"+"gnmetabizrules.json"  
+           
     def  metadb_nodes_append_write(self, metaDF):
 
 
@@ -79,17 +79,25 @@ class  GNGraphStaticFileOps:
             json.dump(jdict, fp)
 
             
-    def  get_metnode_id(self, name):
+    def  metadb_metanode_id_get(self, name):
 
           metaDF = pds.read_json(self.gnmetanode_filepath)
-          rDF = metaDF.query('gnnodename == "sales"')
-          nres = rDF["gnnodeid"].count()
-          if (nres > 0):
-              gnnode_id = rDF["gnnodeid"][0]
+          metaDF.head(2)
+          print('gngrpStaticFileOps: getting metanode: '+self.gnmetanode_filepath)
+          
+          rDF = metaDF.query('gnnodename == "'+name+'"')
+          ##nres = rDF["gnnodeid"].count()
+          ##if (nres > 0):
+
+          print('gngrpStaticFileOps: Getting metanode id '+name)
+          if (rDF.shape[0] > 0):
+              for x in rDF["gnnodeid"]:
+                  gnnode_id = x
           else:
               gnnode_id = -1
           return gnnode_id
 
+      
     def   create_gndata_datadirs(self, bizdomain, nodename):
 
          bizdomain_dir = self.gndata_graph_data_folder+"/"+bizdomain
@@ -127,3 +135,52 @@ class  GNGraphStaticFileOps:
         with open(self.gnmetaedge_filepath, 'w') as fp:
             json.dump(jdict, fp)
 
+
+    def  metadb_bizrules_rule_chk(self, srcnodeid, rulename):
+
+        relid = -1
+        if path.exists(self.gnmetabizrules_filepath):
+        
+           metaBizRDF = pds.read_json(self.gnmetabizrules_filepath)
+           rDF = metaBizRDF.query("gnsrcnodeid == "+str(srcnodeid)+' and  gnrelname == "'+rulename+'" ')
+           relid = -1
+           ###nres = rDF["gnnodeid"].count()
+           if (rDF.shape[0] > 0):
+              for x in rDF["gnrelid"]:
+                  ##print(' parsing x '+str(x))
+                  ##relid = rDF["gnnodeid"][0]
+                  relid = x
+           else:
+               relid = -1
+
+        return relid
+
+
+    def      metadb_bizrules_bizr_get(self, bizrid):
+
+        rJson = {}
+        if path.exists(self.gnmetabizrules_filepath):
+           metaBizRDF = pds.read_json(self.gnmetabizrules_filepath)
+           rDF = metaBizRDF.query("gnrelid == "+str(bizrid)+" ")
+           res = resDF.to_json(orient="records")
+           rJson = json.loads(res)
+
+        return rJson
+
+
+    
+            
+    def  metadb_bizrules_append_write(self, metaDF):
+
+
+        if path.exists(self.gnmetabizrules_filepath):
+            cDF = pds.read_json(self.gnmetabizrules_filepath)
+            jDF = cDF.append(metaDF, ignore_index=True)
+        else:
+            jDF = metaDF
+
+        jstr = jDF.to_json(orient='records')
+        jdict = jDF.to_dict(orient='records')
+
+        with open(self.gnmetabizrules_filepath, 'w') as fp:
+            json.dump(jdict, fp)

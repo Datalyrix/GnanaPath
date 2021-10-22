@@ -1,4 +1,4 @@
-#Example python program to read data from a PostgreSQL table
+# Example python program to read data from a PostgreSQL table
 # and load into a pandas DataFrame
 
 import psycopg2
@@ -238,7 +238,7 @@ class     GNGraphIngestOps:
          self.__gngrp_cfg.save_edgeid_max(gn_edgeid_max_n)
 
          
-         
+
 def     gngraph_ingest_file_api(filename, ftype, fdelim, nodename, bizdomain, gndata_folder, gngraph_creds_folder):
 
 

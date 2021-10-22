@@ -1,15 +1,15 @@
 import psycopg2
 from sqlalchemy import create_engine
+import json
 import pandas as pds
 
 """
 gngraph db implementation main class and associated functions
 current implementation uses postgres as underlying database
-
 """
 
 
-class GNGraphPgresDBOps:
+class       GNGraphPgresDBOps:
 
     @classmethod
     def from_json(cls, dbname, json_file="gngraph_pgresdb_creds.json"):
@@ -40,6 +40,7 @@ class GNGraphPgresDBOps:
             self.dbname = dbname
             self.connected = 1
             self.gnnode_table = "gnnodes"
+            self.gnbizrules_table = "gnbizrules"
             self.gnmeta_schema = "gnmeta"
             self.gnedge_table = "gnedges"
             self.dbtype = dbtype
@@ -49,7 +50,7 @@ class GNGraphPgresDBOps:
             self.connected = 0
             print('gngraphPgresDBOps: unable to connect pgres ')
 
-    def  metadb_nodes_getall(self, isResultDataFrame):
+    def    metadb_nodes_getall(self, isResultDataFrame):
         psql_query = '''
              SELECT  * FROM gnmeta.gnnodes
              ''';
@@ -63,7 +64,7 @@ class GNGraphPgresDBOps:
 
 
 
-    def  metadb_nodes_write(self, metaDF):
+    def    metadb_nodes_write(self, metaDF):
         ### Write metaDF to db
         ### insert mdf to postgresdb
         #tgt_table="gnnodes"
@@ -141,3 +142,56 @@ class GNGraphPgresDBOps:
         print('PgreDBOps: tablstr: '+create_tbl_str)
         self.dbEngine.execute(create_tbl_str) 
         return
+
+
+    def      metadb_metanode_chk_nodeid(self, nodename):
+
+        psql_query = "SELECT * from gnmeta.gnnodes where gnnodename='"+nodename+"' AND gnnodetype='GNMetaNode' "
+        resDF = pds.read_sql(psql_query, self.dbConnp)
+        nodeid=None
+        
+        if (resDF.shape[0] > 0):
+            for x in resDF["gnnodeid"]:
+                nodeid = x
+        else:
+            nodeid = -1
+        ##return resDF.values.tolist()
+        return nodeid
+
+
+    def      metadb_bizrules_rule_chk(self, srcnodeid, rulename):
+
+        gnbizr_tbl = self.gnmeta_schema+"."+self.gnbizrules_table
+        psql_query = "SELECT * from "+gnbizr_tbl+" where gnrelname='"+rulename+"' AND gnsrcnodeid="+str(srcnodeid)+"  "
+        resDF = pds.read_sql(psql_query, self.dbConnp)
+        relid=-1
+        if (resDF.shape[0] > 0):
+            for x in resDF["gnrelid"]:
+                relid = x
+        else:
+            relid = -1
+
+        return relid
+
+
+
+    def      metadb_bizrules_bizr_get(self, bizrid):
+
+        gnbizr_tbl = self.gnmeta_schema+"."+self.gnbizrules_table
+        psql_query = "SELECT * from "+gnbizr_tbl+"  where gnrelid="+str(bizrid)+"   "
+        resDF = pds.read_sql(psql_query, self.dbConnp)
+        res = resDF.to_json(orient="records")
+        rJson = json.loads(res)
+         
+        return rJson
+
+
+
+    
+    
+    def  metadb_bizrules_write(self, metaBizRuleDF):
+
+        if (self.connected):
+            metaBizRuleDF.to_sql(self.gnbizrules_table, self.dbConnp, schema=self.gnmeta_schema,  if_exists='append', index=False)
+            return 0
+

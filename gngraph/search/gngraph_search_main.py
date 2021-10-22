@@ -15,7 +15,7 @@ from pyspark.sql import functions as F
 from pyspark.sql.functions import lit,split
 from pyspark.sql import Row
 from pyspark.sql.types import *
-
+from pyspark.sql.functions import col,from_json
 
 import os,sys
 curentDir = os.getcwd()
@@ -23,10 +23,10 @@ parentDir = curentDir.rsplit('/', 1)[0]
 if parentDir not in sys.path:
     sys.path.append(parentDir)
 
-from config.gngraph_config import GNGraphConfig
-from gngraph_dbops.gngraph_pgresdbops_srch import GNGraphSrchPgresDBOps
-from gngraph_dbops.gngraph_staticfileops_srch import GNGraphSrchStaticFileOps
-
+from gngraph.config.gngraph_config import GNGraphConfig
+from gngraph.gngraph_dbops.gngraph_pgresdbops_srch import GNGraphSrchPgresDBOps
+from gngraph.gngraph_dbops.gngraph_staticfileops_srch import GNGraphSrchStaticFileOps
+from gngraph.search.gngraph_sqlparser import GNGraphSqlParserOps
 
 
 class     GNgraphSearchOps:
@@ -45,12 +45,17 @@ class     GNgraphSearchOps:
             'gngraph_edge_filename': '',
      }
     
-    def __init__(self, gngrp_datadir, accessmode, fargs, dbargs, entlist, sp):
+    def __init__(self, sqlstmt, gngrp_datadir, accessmode, fargs, dbargs, sp):
         ###Set up config init routine
         self.__gncfg = {}
         self.__gncfg_fargs = {}
         self.__spark = sp
-        self.__entlist = entlist
+        self.__gn_srch_sql = sqlstmt  
+        print("GnGrphSrch: Sql st "+self.__gn_srch_sql)  
+        self.__gn_ssql_parsed = GNGraphSqlParserOps(self.__gn_srch_sql)
+        
+        self.__entlist = self.__gn_ssql_parsed.get_entlist()
+        self.__gn_ssql_parsed_where_str = self.__gn_ssql_parsed.get_where_str()
         self.__gngrp_dnDFList = []
         
         self.gngraph_config_init(gngrp_datadir, accessmode, fargs, dbargs)
@@ -238,12 +243,13 @@ class     GNgraphSearchOps:
                self.__gngrp_dnDFList.append(ent_metanode_info)
             else:
                print("gngrp_srch_setup: "+node_name+" nodeDF is empty ")
-                                    
-    def     gngraph_execute_sqlqry(self, sqlst):
 
+        return
+    
+    def     gngraph_execute_sqlqry(self, sqlst):        
         resDF = self.__spark.sql(sqlst)
-        resDF.show(10)
-        print(resDF.count())
+        ##resDF.show(10)
+        ###print(resDF.count())
         ##resJson = resDF.toDF().toJSON()
         #resJson = resDF.toJSON().first()
         resJson = resDF.toJSON().map(lambda j: json.loads(j)).collect()
@@ -253,68 +259,68 @@ class     GNgraphSearchOps:
         return (resDF, resJson)
 
 
-    def gngraph_executeqry_getedges(self, dnodeDF, sqlst):
+    def    gngraph_executeqry_getedges(self, dnodeDF, sqlst):
 
          # first map gnedges
+         print('GNGraphSrchMain:GetEdges  sql stmt '+sqlst)
          self.get_metaedges_mapped_df()
          self.get_metanodes_mapped_df()
          
-         cond=[(self.__gnmetaEdgeDF.gntgtnodeid == dnodeDF.gnnodeid)\
-               | (self.__gnmetaEdgeDF.gnsrcnodeid == dnodeDF.gnnodeid)]
+         cond=[(self.__gnmetaEdgeDF.gntgtnodeid == dnodeDF.gnnodeid) | (self.__gnmetaEdgeDF.gnsrcnodeid == dnodeDF.gnnodeid)]
          jDF=self.__gnmetaEdgeDF.join(dnodeDF, cond , 'inner')
 
          print('GNGraphSrchOps: edges for datanode generated')
          ### turn edges result into json 
          edgesJson = jDF.toJSON().map(lambda j: json.loads(j)).collect()
          
-         jDF.select("gnnodeid", "gnedgeid", \
-                    "gnsrcnodeid", "gntgtnodeid").show(10)
+         ###jDF.select("gnnodeid", "gnedgeid", \
+         ###           "gnsrcnodeid", "gntgtnodeid").show(10)
          
          mcols = [F.col("gnsrcnodeid"), F.col("gntgtnodeid")] 
          
          res = jDF.withColumn("tgtnodes", F.array(mcols))\
                   .select("gnedgeid", "gnnodeid", "tgtnodes")
          ##_union(col("gntgtnodeid"), col("gnsrcnodeid")))
-         res.show(10)
+         ##res.show(10)
          
          res2 = res.withColumn("srcnodes", F.array(F.col("gnnodeid")))\
                   .select("*")
-         res2.show(10)
+         ##res2.show(10)
                   
          res3 = res2.withColumn("filternodes", \
                                 F.array_except(F.col("tgtnodes"), \
                                 F.col("srcnodes"))).select("*")
          
-         res3.show()
+         ##res3.show()
 
          #### Transpose column into list
          fDF = res3.select("filternodes").distinct()
          tgtNodeList = res3.select("filternodes").distinct().collect()
-         for x in tgtNodeList:
-             print(x)
+         ##for x in tgtNodeList:
+         ##    print(x)
 
          # Iterate over list and get node info from gnmetanodes
-         fDF.printSchema()
-         fDF.show()
+         #fDF.printSchema()
+         #fDF.show()
          f1DF = fDF.select(F.explode(F.col("filternodes")).alias("fnodes"))
-         f1DF.printSchema()
-         f1DF.show()
+         #f1DF.printSchema()
+         #f1DF.show()
          tgtNodeList = f1DF.select("fnodes").distinct().collect()
          #print(tgtNodeList)
          tgt_NodeList=[]
          for row in tgtNodeList:
-            print(row['fnodes'])
+            ###print(row['fnodes'])
             tgt_NodeList.append(row['fnodes'])
 
          ### now iterate over list and get gnnode
          print('Preparing the tgtNodeList') 
          nodelist=[]
          for x in tgt_NodeList:
-            print(x)
+            ###print(x)
             nid = x
             sqlstr="SELECT * from gnmetanodes where gnnodeid="+str(nid)+""
-            print(sqlstr)
-            jDF = spark.sql(sqlstr)
+            ##print(sqlstr)
+            jDF =  self.__spark.sql(sqlstr)
             ##jDF.printSchema()
             ##j = jDF.toJSON() 
             resJson = jDF.toJSON().map(lambda j: json.loads(j)).collect()
@@ -322,11 +328,82 @@ class     GNgraphSearchOps:
             nodelist.append(resJson[0])
 
          print('GNGraphSrchOps: tgtNode list enumerated')
-         print(nodelist)   
+         ##print(nodelist)   
          return (edgesJson, nodelist)   
 
-            
-         
+     
+    def    gngraph_metarepo_qry_getedges(self, rnodeDF, sqlst):
+
+         # first map gnedges
+         print('GNGraphSrchMain: sql stmt '+sqlst)
+         self.get_metaedges_mapped_df()
+         self.get_metanodes_mapped_df()
+         cond=[((self.__gnmetaEdgeDF.gntgtnodeid == rnodeDF.gnnodeid) | (self.__gnmetaEdgeDF.gnsrcnodeid == rnodeDF.gnnodeid)) & (self.__gnmetaEdgeDF.gnedgetype == 'GNMetaNodeEdge')]
+         jDF=self.__gnmetaEdgeDF.join(rnodeDF, cond , 'inner')
+
+         print('GNGraphSrchOps: edges for datanode generated')
+         ### turn edges result into json
+         edgesJson = jDF.toJSON().map(lambda j: json.loads(j)).collect()
+         ##jDF.select("gnnodeid", "gnedgeid", \
+         ###           "gnsrcnodeid", "gntgtnodeid").show(10)
+
+         mcols = [F.col("gnsrcnodeid"), F.col("gntgtnodeid")]
+
+         res = jDF.withColumn("tgtnodes", F.array(mcols))\
+                  .select("gnedgeid", "gnnodeid", "tgtnodes")
+         ##_union(col("gntgtnodeid"), col("gnsrcnodeid")))
+         ####res.show(10)
+
+         res2 = res.withColumn("srcnodes", F.array(F.col("gnnodeid")))\
+                  .select("*")
+         ###res2.show(10)
+
+         res3 = res2.withColumn("filternodes", \
+                                F.array_except(F.col("tgtnodes"), \
+                                F.col("srcnodes"))).select("*")
+         ###res3.show()
+
+         #### Transpose column into list
+         fDF = res3.select("filternodes").distinct()
+         tgtNodeList = res3.select("filternodes").distinct().collect()
+         ####for x in tgtNodeList:
+         ####    print(x)
+
+         # Iterate over list and get node info from gnmetanodes
+         ##fDF.printSchema()
+         ##fDF.show()
+         f1DF = fDF.select(F.explode(F.col("filternodes")).alias("fnodes"))
+         ###f1DF.printSchema()
+         ###f1DF.show()
+         tgtNodeList = f1DF.select("fnodes").distinct().collect()
+         #print(tgtNodeList)
+         tgt_NodeList=[]
+         for row in tgtNodeList:
+            ####print(row['fnodes'])
+            tgt_NodeList.append(row['fnodes'])
+
+         ### now iterate over list and get gnnode
+         print('Preparing the tgtNodeList')
+         nodelist=[]
+         for x in tgt_NodeList:
+            ###print(x)
+            nid = x
+            sqlstr="SELECT * from gnmetanodes where gnnodeid="+str(nid)+""
+            ####print(sqlstr)
+            jDF =  self.__spark.sql(sqlstr)
+            ##jDF.printSchema()
+            ##j = jDF.toJSON()
+            resJson = jDF.toJSON().map(lambda j: json.loads(j)).collect()
+            ##print(resJson[0])
+            nodelist.append(resJson[0])
+
+         print('GNGraphSrchOps: tgtNode list enumerated')
+         ####print(nodelist)
+         return (edgesJson, nodelist)
+
+
+
+
 def       gngraph_init(rootDir):
 
     app_name = "gngraph"
@@ -339,9 +416,9 @@ def       gngraph_init(rootDir):
     return gngraph_cls
 
 
-                                    
 
-def     gngrph_srch_get_entlist(sqlst):
+
+def     gngrph_srch_get_entlist_obsolete(sqlst):
 
 
     print('gnsrch_process_select_conevert: processing sqlstring ' + sqlst)
@@ -378,7 +455,9 @@ def     gngrph_srch_get_entlist(sqlst):
         
         return nodes_list
 
-def        gngrp_srch_qry_api(sqlst, spark, gndata_folder, gngraph_creds_folder):
+        
+
+def        gngrp_srch_qry_api(sqlst, spark, gndata_folder, gngraph_creds_folder, nodesonly):
         
         gdb_creds_filepath=gngraph_creds_folder+"/gngraph_pgres_dbcreds.json"
         fileargs = {}
@@ -399,24 +478,143 @@ def        gngrp_srch_qry_api(sqlst, spark, gndata_folder, gngraph_creds_folder)
         fargs["gnmetanodesfname"] = "gnmeanodes.json"
         fargs["gnmetaedgesfname"] = "gnmetaedges.json"
 
-        accessmode="db"
+        accessmode="files"
                                     
-        entlist = gngrph_srch_get_entlist(sqlst)                                         
-        gnsrch_ops = GNgraphSearchOps(gndata_folder, accessmode, fargs, gdbargs, entlist, spark)
+        ###entlist = gngrph_srch_get_entlist(sqlst)                                         
+        gnsrch_ops = GNgraphSearchOps(sqlst, gndata_folder, accessmode, fargs, gdbargs, spark)
         print('GNGrphSrchMain: Search init COMPLETE ')
         gnsrch_ops.gngraph_search_setup_api()
         
         (resNodeDF, nodesjson) = gnsrch_ops.gngraph_execute_sqlqry(sqlst)
         print('GNGrphSrchMain: datanodes fetched ')
+        print('GNGrphSrchMain: Sql st:'+sqlst)
         ##print(nodesjson)
         print('GNGrphSrchMain: Search nodes complete. get edges ')
-        (edgesjson,derived_nodesjson) = gnsrch_ops.gngraph_executeqry_getedges(resNodeDF, sqlst)    
-        print('GNGrphSrchMain: Edges and derived nodes enumerated')
+        ###resNodeDF.show(10)       
+        edgesjson = ""
+        
+        if (nodesonly == 0):  
+           (edgesjson,derived_nodesjson) = gnsrch_ops.gngraph_executeqry_getedges(resNodeDF, sqlst)    
+           print('GNGrphSrchMain: Edges and derived nodes enumerated')
+           njson = nodesjson+derived_nodesjson
+        else:
+           njson = nodesjson
+           edgesjson={}
+        return (njson, edgesjson)
+
+#######
+def          gngrp_srch_metarepo_qry_api(sqlst, spark, gndata_folder, gngraph_creds_folder, nodesonly):
+
+        gdb_creds_filepath=gngraph_creds_folder+"/gngraph_pgres_dbcreds.json"
+        fileargs = {}
+
+        gdbargs = {}
+        gdbargs["gdb"] = "pgres"
+        gdbargs["gdbflag"] = 1
+        gdbargs["gdbcredsfpath"] = gdb_creds_filepath
+        gdbargs["gnmetaDB"] = "gngraph_db"
+        gdbargs["gndataDB"] = "gngraph_db"
+        gdbargs["staticfiles"] = 1
+        gdbargs["staticfpath"] = gndata_folder+"/uploads";
+        gdbargs["gndatafolder"] = gndata_folder
+
+        fargs = {}
+        fargs["gngraphfolder"] = gndata_folder+"/gngraph"
+        fargs["gnmetanodesfname"] = "gnmeanodes.json"
+        fargs["gnmetaedgesfname"] = "gnmetaedges.json"
+
+        accessmode="pgres"
+        ###entlist = gngrph_srch_get_entlist(sqlst)
+
+        gnsrch_ops = GNgraphSearchOps(sqlst, gndata_folder, accessmode, fargs, gdbargs, spark)
+
+        ###where_str = self.__gn_ssql_parsed_where_str
+        msql_st = "SELECT * from gnmetanodes  WHERE gnnodetype='GNMetaNode' OR "
+        print('GNGrphMetaSrchMain: Search init COMPLETE ')
+        ##gnsrch_ops.gngraph_search_metarepo_setup_api()
+        
+        (resNodeDF, nodesjson) = gnsrch_ops.gngraph_execute_sqlqry(sqlst)
+        print('GNGrphMetaSrchMain: datanodes fetched ')
+        print('GNGrphMetaSrchMain: Sql st:'+sqlst)
+        ##print(nodesjson)
+        print('GNGrphMetaSrchMain: Search nodes complete. get edges ')
+        ####resNodeDF.show(10)
+        edgesjson = ""
+        (edgesjson, derived_nodesjson) = gnsrch_ops.gngraph_metarepo_qry_getedges(resNodeDF, sqlst)
         njson = nodesjson+derived_nodesjson
         
         return (njson, edgesjson)
-                                    
-                                    
+
+
+
+
+def         gngrph_srch_datarepo_qry_fetch(srchfilter, spark, gndata_folder, gngraph_creds_folder):
+
+
+
+    nodesonly = 0
+    (njson, edgesjson) = gngrp_srch_qry_api(srchfilter, spark, gndata_folder, gngraph_creds_folder, nodesonly)
+    nDF = spark.createDataFrame(njson)
+    #resDF = nDF.filter(nDF.gnnodetype != "GNDataNode")\
+    resDF = nDF.select(col("gnnodeid").alias("id"), \
+                col("gnnodetype").alias("nodetype"), \
+                col("gnlabel").alias("nodename"))
+
+    res = resDF.toJSON().map(lambda j: json.loads(j)).collect()
+    rJ = {}
+    rJ["nodes"] = res
+
+    edgResDF = spark.createDataFrame(edgesjson)
+    eResDF = edgResDF.select(col("gnedgeid").alias("id"), \
+                              col("gnedgetype").alias("type"), \
+                              col("gnsrcnodeid").alias("source"), \
+                              col("gntgtnodeid").alias("target"))
+    ###eResDF.show(10)
+    eres = eResDF.toJSON().map(lambda j: json.loads(j)).collect()
+    ###eres = eResDF.toJSON().first()
+    ###eres = eResDF.toJSON().first()
+    rJ["edges"] = eres
+
+    return(rJ)
+
+
+
+    
+    
+
+def        gngrph_srch_metarepo_nodes_edges_fetch(srchfilter, spark, gndata_folder, gngraph_creds_folder):
+
+
+    sqlst = "select * from gnmetanodes WHERE gnnodetype='GNMetaNode' OR gnnodetype='GNMetaNodeAttr'"
+    
+    nodesonly = 1
+    (njson, edgesjson) = gngrp_srch_metarepo_qry_api(sqlst, spark, gndata_folder, gngraph_creds_folder, nodesonly)
+    nDF = spark.createDataFrame(njson)
+    #resDF = nDF.filter(nDF.gnnodetype != "GNDataNode")\
+    resDF = nDF.select(col("gnnodeid").alias("id"), \
+                col("gnnodetype").alias("nodetype"), \
+                col("gnnodename").alias("nodename"))
+    
+    res = resDF.toJSON().map(lambda j: json.loads(j)).collect()
+    rJ = {}
+    rJ["nodes"] = res
+
+    edgResDF = spark.createDataFrame(edgesjson)
+    eResDF = edgResDF.select(col("gnedgeid").alias("id"), \
+                              col("gnedgetype").alias("type"), \
+                              col("gnsrcnodeid").alias("source"), \
+                              col("gntgtnodeid").alias("target"))
+    ###eResDF.show(10)
+    eres = eResDF.toJSON().map(lambda j: json.loads(j)).collect()
+    ###eres = eResDF.toJSON().first()
+    rJ["edges"] = eres                              
+    
+        
+    return(rJ)
+
+    
+
+
 if __name__ == "__main__":
 
     print("Starting gn ingest file")
@@ -435,8 +633,8 @@ if __name__ == "__main__":
     
     ### Set spark session
     spark = SparkSession.builder.appName(app_name).getOrCreate()
-   
-    (nJSON, eJSON) = gngrp_srch_qry_api(sqlst, spark, gndata_folder, gngraph_creds_folder)
+    nodesonly = 0
+    (nJSON, eJSON) = gngrp_srch_qry_api(sqlst, spark, gndata_folder, gngraph_creds_folder, nodesonly)
     rfile="nodes.json" 
     with open(rfile, 'w') as fp:
             json.dump(nJSON, fp)

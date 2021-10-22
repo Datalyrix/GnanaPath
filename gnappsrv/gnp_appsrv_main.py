@@ -18,6 +18,11 @@ from gnutils.get_config_file import get_config_neo4j_conninfo_file
 from gndwdb.gndwdb_neo4j_fetchops import gndwdb_metarepo_nodes_fetch_api, gndwdb_metarepo_edges_fetch_api
 from gnsearch.gnsrch_sql_srchops import gnsrch_sqlqry_api
 from gndwdb.gndwdb_neo4j_conn import gndwdb_neo4j_conn_check_api, gndwdb_neo4j_parse_config
+from gngraph.ingest.gngraph_ingest_main import gngraph_init
+from gndatadis.gndd_filedb_ops import gndd_filedb_insert_file_api, gndd_filedb_filelist_get
+from gndatadis.gndd_filelist_table import GNFileLogResults
+from gngraph.search.gngraph_search_main import gngrph_srch_metarepo_nodes_edges_fetch, gngrph_srch_datarepo_qry_fetch
+
 import flask
 from flask import request, jsonify, request, redirect, render_template, flash, url_for, session, Markup, abort
 from werkzeug.utils import secure_filename
@@ -31,6 +36,11 @@ from connect_form import ConnectServerForm, LoginForm
 from collections import OrderedDict
 from gnp_db_ops import ConnectModel
 import gn_config as gnconfig
+from pathlib import Path
+import json
+import pathlib
+from pyspark.sql import SparkSession
+
 
 # Append system path
 
@@ -68,11 +78,19 @@ gnlogger = gnconfig.gn_logging_init(app, "GNPath")
 ###UPLOAD_FOLDER = os.path.join(path, 'uploads')
 UPLOAD_FOLDER = app.config["gnUploadsFolder"]
 
+
 # Make directory if uploads is not exists
 if not os.path.isdir(UPLOAD_FOLDER):
     os.mkdir(UPLOAD_FOLDER)
 
+    
 ###app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+#### Initialize Spark Session
+gnGraphCls = gngraph_init(app.config["gnRootDir"])
+
+app_name="gngraph_spk"
+spark =SparkSession.builder.appName(app_name).getOrCreate()
 
 # Allowed extension you can set your own
 ALLOWED_EXTENSIONS = set(['csv', 'json', ])
@@ -109,7 +127,12 @@ def gn_home():
 def upload_file():
     _srch = True if check_server_session() else False
     if request.method == 'GET':
-        return render_template('upload.html', disp_srch=_srch)
+        fres = gndd_filedb_filelist_get(app.config["gnCfgDBFolder"]);
+        flen = len(fres)
+        ###fres_table = GNFileLogResults(items=fres)
+        print('upload ')
+        print(fres)
+        return render_template('upload.html', disp_srch=_srch, file_res=fres, flen=flen)
     if request.method == 'POST':
 
         if 'fd' not in request.files:
@@ -119,6 +142,15 @@ def upload_file():
         files = request.files["fd"]
         print(files)
 
+        fdesc = request.form["fdesc"];
+        print(' upload fdesc '+fdesc);
+
+        ftype = request.form["ftype"];
+        print(' upload ftype '+ftype);
+
+        fdelim = request.form['fdelim'];
+        print(' upload fdelim '+fdelim);
+        
         if not allowed_file(files.filename):
             flash('Please upload CSV or JSON file', 'danger')
             return redirect(request.url)
@@ -127,11 +159,22 @@ def upload_file():
             file_name,file_ext=fname.split(".")
             filename= re.sub(r'\W+','',file_name)+f'.{file_ext}'
             print(filename)
+            print(app.config['gnUploadsFolder'])
             files.save(os.path.join(app.config['gnUploadsFolder'], filename))
-            gndwdbDataUpload(app.config['gnUploadsFolder'], filename)
-
+            ### For timebeing disable csv file upload
+            ###gndwdbDataUpload(app.config['gnUploadsFolder'], filename)
+            ###fdelim = ','
+            fp = Path(app.config['gnUploadsFolder']+"/"+filename)
+            fsize = fp.stat().st_size
+            gndd_filedb_insert_file_api(filename, fsize, ftype, fdesc, fdelim, app.config["gnCfgDBFolder"])
+            fres = gndd_filedb_filelist_get(app.config["gnCfgDBFolder"]);
+            flen = len(fres)
+            #print(fres_table)
+            ##fres_table = GNFileLogResults(items=fres)
+            
         flash(f'File {filename} successfully uploaded', 'success')
-        return redirect(url_for('gn_home', disp_srch=_srch))
+        ####return redirect(url_for('gn_home', disp_srch=_srch))
+        return render_template('upload.html', disp_srch=_srch, file_res=fres, flen=flen)
 
 
 def neo4j_conn_check_api():
@@ -162,7 +205,7 @@ def connect_server():
         srv_ip_encode = base64.urlsafe_b64encode(
             session['serverIP'].encode("utf-8"))
         srv_encode_str = str(srv_ip_encode, "utf-8")
-        flash(Markup('Connected to neo4j server {},Click <a href=/modify/{}\
+        flash(Markup('Connected to db server {},Click <a href=/modify/{}\
              class="alert-link"> here</a> to modify'.format(session['serverIP'], srv_encode_str)), 'info')
         return redirect(url_for('gn_home', disp_srch=True))
     if form.validate_on_submit():
@@ -172,7 +215,7 @@ def connect_server():
         res = neo4j_conn_check_api()
         if res == "Error":
             flash(
-                f'Error connecting to neo4j server {form.serverIP.data}',
+                f'Error connecting to db server {form.serverIP.data}',
                 'danger')
             connect.delete_op(req_dict)
             return render_template(
@@ -182,7 +225,7 @@ def connect_server():
             flash(f'Connected to server {form.serverIP.data}!', 'success')
             return redirect(url_for('gn_home', disp_srch=True))
     return render_template(
-        'connect.html', title='Connect Graph Server', form=form, disp_srch=False)
+        'connect_db.html', title='Connect Graph Server', form=form, disp_srch=False)
 
 
 @app.route("/modify/<serverIP>", methods=['GET', 'POST'])
@@ -297,16 +340,30 @@ def gnsrch_api():
         gnlogger.info('GNPAppServer: search qry : ' + srchqry_filtered)
 
         # call gnsearch api
-        res = gnsrch_sqlqry_api(srchqry_filtered, verbose)
-        res_data = re.sub(r"(\w+):", r'"\1":', res)
+        #res = gnsrch_sqlqry_api(srchqry_filtered, verbose)
+        gndata_folder=app.config["gnDataFolder"]
+        gngraph_creds_folder=app.config["gnGraphDBCredsFolder"]
+        ###res = gngrph_srch_metarepo_nodes_fetch(srchfilter, spark, gndata_folder, gngraph_creds_folder)
 
-        gnlogger.info('GNPAppSrch:   res : ' + res)
+        
+        res = gngrph_srch_datarepo_qry_fetch(srchqry_filtered, spark, gndata_folder, gngraph_creds_folder)
+
+        
+        ###res_data = re.sub(r"(\w+):", r'"\1":', res)
+        gnlogger.info('GNPAppServer: Fetch Data Nodes with filter '+srchqry_filtered+' SUCCESS')
+        print('GNPAppServer: Fetch Data Nodes with filter '+srchqry_filtered+' SUCCESS')
+        ##print(res)
+
+
+        
+        ##res = {}
+        ##res_data = re.sub(r"(\w+):", r'"\1":', res)
 
         rjson = {
             "status": "SUCCESS",
-            "data": res_data
+            "gndata": res
         }
-        return res
+        return rjson
 
     else:
         errstr = {
@@ -346,10 +403,13 @@ def gnmetanodes_fetch_api():
 
     # call gnmeta node search api Right now ignore searchqry arg
 
-    res = gndwdb_metarepo_nodes_fetch_api(verbose)
-    res_data = re.sub(r"(\w+):", r'"\1":', res)
-    gnlogger.info('GNPAppServer:   res : ' + res)
-
+    ##res = gndwdb_metarepo_nodes_fetch_api(verbose)
+    srchfilter=""
+    gndata_folder=app.config["gnDataFolder"]
+    gngraph_creds_folder=app.config["gnGraphDBCredsFolder"]
+    res = gngrph_srch_metarepo_nodes_fetch(srchfilter, spark, gndata_folder, gngraph_creds_folder) 
+    ###res_data = re.sub(r"(\w+):", r'"\1":', res)
+    gnlogger.info('GNPAppServer:  metanode search  with filter '+srchfilter+'  SUCCESS : ')
     rjson = {
         "status": "SUCCESS",
         "data": res_data
@@ -382,17 +442,24 @@ def gnmetaedges_fetch_api():
 
     # call gnmeta node search api Right now ignore searchqry arg
 
-    res = gndwdb_metarepo_edges_fetch_api(srchqry, verbose)
-    res_data = re.sub(r"(\w+):", r'"\1":', res)
-    gnlogger.info('GNPAppServer:   res : ' + res)
-
+    ##res = gndwdb_metarepo_edges_fetch_api(srchqry, verbose)
+    srchfilter=""
+    gndata_folder=app.config["gnDataFolder"]
+    gngraph_creds_folder=app.config["gnGraphDBCredsFolder"]
+    res = gngrph_srch_metarepo_nodes_edges_fetch(srchfilter, spark, gndata_folder, gngraph_creds_folder)
+    
+    ##res_data = re.sub(r"(\w+):", r'"\1":', res)
+    gnlogger.info('GNPAppServer: metanodes and edges with filter '+srchfilter+' SUCCESS ')
+    ###print("GNEdges: ")
+    ####print(res)
+    
     rjson = {
         "status": "SUCCESS",
-        "data": res_data
+        "gndata": res
     }
 
     # return json.JSONDecoder(object_pairs_hook=OrderedDict).decode()
-    return res_data
+    return rjson
 
 
 if __name__ == '__main__':

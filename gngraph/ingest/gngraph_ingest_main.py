@@ -533,7 +533,7 @@ def      gngraph_init(rootDir):
     app_name = "gngraph"
     gngraph_cls = gnGraphIngest(rootDir)
 
-    console.log(' Gngraph Init no spark Context')
+    print(' Gngraph Init no spark Context')
     ### Set spark session
     ##spark = SparkSession.builder.appName(app_name).getOrCreate()
 
