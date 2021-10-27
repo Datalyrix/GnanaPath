@@ -12,6 +12,9 @@ curentDir = os.getcwd()
 listDir = curentDir.rsplit('/', 1)[0]
 sys.path.append(listDir)
 ###sys.path.append(listDir + '/gndatadis')
+import findspark
+
+findspark.init()
 
 from gndatadis.gndd_csv_load import gndwdbDataUpload  # to upload Files.
 from gnutils.get_config_file import get_config_neo4j_conninfo_file
@@ -22,6 +25,8 @@ from gngraph.ingest.gngraph_ingest_main import gngraph_init
 from gndatadis.gndd_filedb_ops import gndd_filedb_insert_file_api, gndd_filedb_filelist_get
 from gndatadis.gndd_filelist_table import GNFileLogResults
 from gngraph.search.gngraph_search_main import gngrph_srch_metarepo_nodes_edges_fetch, gngrph_srch_datarepo_qry_fetch
+from gngraph.gngraph_dbops.gngraph_pgresdbops import GNGraphPgresDBOps
+
 
 import flask
 from flask import request, jsonify, request, redirect, render_template, flash, url_for, session, Markup, abort
@@ -34,7 +39,7 @@ import json
 import re
 from connect_form import ConnectServerForm, LoginForm
 from collections import OrderedDict
-from gnp_db_ops import ConnectModel
+from gnp_db_ops import GNGraphDBConfigModel, GNGraphConfigModel
 import gn_config as gnconfig
 from pathlib import Path
 import json
@@ -193,39 +198,117 @@ def check_server_session():
     return True if 'serverIP' in session else False
 
 
+@app.route("/gdbconfig", methods=['GET', 'POST'])
+@login_required
+def  gdb_config():
+
+    gdbcfg = GNGraphConfigModel(app.config["gnGraphDBCredsFolder"])
+    gdbcfg_settings = gdbcfg.get_op()
+    if gdbcfg_settings is None:
+       gdbcfg_settings = {} 
+       gdbcfg_settings['sfmode'] = 1
+       gdbcfg_settings['dbmode'] = 0
+    print(gdbcfg_settings)
+    #if (request.method == 'GET'):
+        
+    if (request.method == 'POST'):
+        print('GB Config POST')
+        in_vars = request.form.to_dict()
+        print(in_vars)
+        cfg_setting = gdbcfg_settings
+        if ('sfmode' in in_vars):
+            print('GNGraphDB: sfmode '+in_vars['sfmode'])
+            if (in_vars['sfmode'] == 'on'):
+                cfg_setting['sfmode'] = 1
+            else:
+                cfg_setting['sfmode'] = 0
+
+        if ('dbmode' in in_vars):
+            print('GNGraphDB: sfmode '+in_vars['sfmode'])
+            if (in_vars['dbmode'] == 'on'):
+                cfg_setting['dbmode'] = 1
+            else:
+                cfg_setting['dbmode'] = 0
+                
+        gdbcfg.insert_op(cfg_setting)
+        return redirect(url_for('gn_home'))    
+          
+    return render_template('gdb_config.html', title='Gnana Graph Server Config', cfg=gdbcfg_settings)
+   
+
 @app.route("/connect", methods=['GET', 'POST'])
 @login_required
 def connect_server():
 
     form = ConnectServerForm()
-    connect = ConnectModel(path)
+    connect = GNGraphDBConfigModel(app.config["gnGraphDBCredsFolder"])
+    conf_settings = GNGraphConfigModel(app.config["gnGraphDBCredsFolder"])
+    conn = {}
+    if (request.method == 'GET'):
+        
+       #if 'serverIP' in session and connect.search_res(session['serverIP']):
+        conn = connect.get_op()
+        print('app srv: ')
+        print(conn)
+        
+        if conn :
+          srv_ip_encode = base64.urlsafe_b64encode(
+            conn['serverIP'].encode("utf-8"))
+          srv_encode_str = str(srv_ip_encode, "utf-8")
+          print('ConnectForm: session ')
+          ##conn['serverIP'] = session['serverIP']
+          ##conn['serverPort'] = session['serverPort']
+          ##conn['user_id'] = session['_user_id']
+          form.serverIP.data = conn['serverIP']
+          form.serverPort.data = conn['serverPort']
+          form.username.data = conn['username']
+          form.dbname.data = conn['dbname']
+          ##print(conn)
+          #flash(Markup('Connected to db server {},Click <a href=/modify/{}\
+          #     class="alert-link"> here</a> to modify'.format(session['serverIP'], srv_encode_str)), 'info')
+          #return redirect(url_for('gn_home', disp_srch=True))
 
-    if 'serverIP' in session and connect.search_res(session['serverIP']):
-
-        srv_ip_encode = base64.urlsafe_b64encode(
-            session['serverIP'].encode("utf-8"))
-        srv_encode_str = str(srv_ip_encode, "utf-8")
-        flash(Markup('Connected to db server {},Click <a href=/modify/{}\
-             class="alert-link"> here</a> to modify'.format(session['serverIP'], srv_encode_str)), 'info')
-        return redirect(url_for('gn_home', disp_srch=True))
-    if form.validate_on_submit():
+        return render_template('db_setup.html', title='Connect Graph Server', form=form, disp_srch=False, conninfo=conn)
+    
+    if (request.method == 'POST'):
+      print('connect_server: POST method input vars')
+      in_vars = request.form.to_dict()
+      print(in_vars)
+      if ( 'db_mode' in in_vars):
+          print(' DB mode set: Postgres ')
+      if ('sf_mode' in in_vars):
+          print(' Static file mode: Static files ')
+          
+      
+      if form.validate_on_submit():
         result = request.form.to_dict()
         req_dict = connect.req_fields_json(result)
-        connect.insert_op(req_dict)
-        res = neo4j_conn_check_api()
+        print('DBConfig: POST ')
+        print(req_dict)
+        
+        connect.upsert_op(req_dict)
+        ##res = neo4j_conn_check_api()
+        res = "Success"
         if res == "Error":
             flash(
                 f'Error connecting to db server {form.serverIP.data}',
                 'danger')
             connect.delete_op(req_dict)
             return render_template(
-                'connect.html', title='Connect Graph Server', form=form, disp_srch=False)
+                'db_setup.html', title='Connect Graph Server', form=form, disp_srch=False)
         else:
             session['serverIP'] = form.serverIP.data
+            session['serverPort'] = form.serverPort.data
             flash(f'Connected to server {form.serverIP.data}!', 'success')
             return redirect(url_for('gn_home', disp_srch=True))
-    return render_template(
-        'connect_db.html', title='Connect Graph Server', form=form, disp_srch=False)
+      else:
+         print('connect_server: Error in form submit')
+         flash(f'Error on submit ', form.errors)         
+         return render_template('db_setup.html', title='Connect Graph Server', form=form,  disp_srch=False)
+  
+        
+    ##return render_template(
+      ##  'connect_db.html', title='Connect Graph Server', form=form, disp_srch=False)
 
 
 @app.route("/modify/<serverIP>", methods=['GET', 'POST'])
@@ -256,7 +339,7 @@ def modify_conn_details(serverIP):
             res = neo4j_conn_check_api()
             if res == "Error":
                 flash(
-                    f'Error connecting to neo4j server {form.serverIP.data}',
+                    f'Error connecting to db server {form.serverIP.data}',
                     'danger')
                 form.connect.label.text = 'Update'
                 connect.delete_op(req_dict)
@@ -305,7 +388,7 @@ def user_login():
         _srch = False
         connect = ConnectModel(path)
         connect._db.truncate()
-        flash("Error connecting to neo4j server", 'danger')
+        flash("Error connecting to db server", 'danger')
         return redirect(url_for('connect_server', disp_srch=_srch))
     _srch = True
     cfg_file = get_config_neo4j_conninfo_file()
@@ -321,7 +404,48 @@ def gnview_cola_api():
     gnlogger.info(' gnview cola is initiated')
     return render_template('gnview/gnsrchview.html', disp_srch=_srch)
 
+@app.route('/api/v1/testdbconn', methods=['GET'])
+@login_required
+def  testdb_conn():
 
+    dbIP=''
+    dbPort=''
+    dbUser=''
+    dbPasswd=''
+    dbname=''
+    if 'dbIP' in request.args:
+      dbIP = request.args['dbIP']
+    
+    if 'dbPort' in request.args:   
+      dbPort = request.args['dbPort']
+      
+    if 'dbUser' in request.args:
+      dbUser = request.args['dbUser']
+
+    if 'dbPasswd' in request.args:  
+      dbPasswd = request.args['dbPasswd']
+
+    if 'dbname' in request.args:  
+      dbname = request.args['dbname']
+    print('Test DB Connection dbIP '+dbIP+"  port "+dbPort)
+    if ((dbIP == '') or dbPort == '' or dbUser == '' or dbPasswd == '' or dbname == ''):
+        print('DBTestConn: Invalid args ')
+        rjson = {
+            "status": "FAIL",
+            "connect_status": 0,
+            "statusmsg": "Invalid Input Arguments"
+            }
+        return jsonify(rjson)
+      
+    pgdb_cls = GNGraphPgresDBOps(dbIP, dbPort, dbUser, dbPasswd,  dbname, "metadb")
+    is_connect = pgdb_cls._isconnected()
+    rjson = {
+        "status": "SUCCESS",
+        "connect_status": is_connect
+    }
+    
+    return jsonify(rjson)
+    
 @app.route('/api/v1/search', methods=['GET'])
 @login_required
 def gnsrch_api():
