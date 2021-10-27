@@ -20,19 +20,19 @@ def        gn_config_dirs(app):
         print(app.config["gnDataFolder"]+" is created")
     if not os.path.isdir(app.config["gnUploadsFolder"]):
         os.mkdir(app.config["gnUploadsFolder"])
-        print(app.config["gnUploadsDir"]+" is created")
+        print(app.config["gnUploadsFolder"]+" is created")
     if not os.path.isdir(app.config["gnCfgDBFolder"]):
         os.mkdir(app.config["gnCfgDBFolder"])
         print(app.config["gnCfgDBFolder"]+" is created")    
     if not os.path.isdir(app.config["gnDiscoveryFolder"]):
         os.mkdir(app.config["gnDiscoveryFolder"])
-        print(app.config["appDiscoveryFolder"]+" is created ")
+        print(app.config["gnDiscoveryFolder"]+" is created ")
     if not os.path.isdir(app.config["gnProfileFolder"]):
         os.mkdir(app.config["gnProfileFolder"])
         print(app.config["gnProfileFolder"]+" is created")
     if not os.path.isdir(app.config["gnGraphFolder"]):
-        os.mkdir(app.config["gnGraphDir"])
-        print(app.config["gnGraphDir"]+" is created")
+        os.mkdir(app.config["gnGraphFolder"])
+        print(app.config["gnGraphFolder"]+" is created")
 
         
 def     gn_logging_init(app, logname):
@@ -49,3 +49,6 @@ def     gn_logging_init(app, logname):
                         level=logging.INFO)
     logger = logging.getLogger(logname)
     return logger
+
+
+
