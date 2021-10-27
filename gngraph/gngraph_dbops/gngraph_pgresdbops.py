@@ -1,5 +1,5 @@
 import psycopg2
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, exc
 import json
 import pandas as pds
 
@@ -29,6 +29,8 @@ class       GNGraphPgresDBOps:
         try:
             #Create an engine instance
             pgres_connstr='postgresql+psycopg2://'+dbuser+':'+dbpasswd+'@'+dbserver+':'+dbport+'/'+dbname
+            print('PgresDBOps: Init ')
+            print(pgres_connstr)
             alchemyEngine   = create_engine(pgres_connstr, pool_recycle=3600)
             # Connect to PostgreSQL server
             self.dbEngine = alchemyEngine
@@ -44,12 +46,37 @@ class       GNGraphPgresDBOps:
             self.gnmeta_schema = "gnmeta"
             self.gnedge_table = "gnedges"
             self.dbtype = dbtype
-    
-        except:
+            print('pgresDBOps: Connected  ')
+            print(self.dbConnp)
+        except exc.SQLAlchemyError as err:
             self.dbConnp = None
             self.connected = 0
             print('gngraphPgresDBOps: unable to connect pgres ')
-
+            print(err)
+            
+        except exc.OperationalErro as err:
+            self.dbConnp = None
+            self.connected = 0
+            print('gngraphPgresDBOps: unable to connect pgres ')
+            print(err)
+                                                            
+      
+        
+    def db_query_execute(self, conn, query):
+        try:
+                    result = conn.execute(query)
+        except sqlalchemy.exc.OperationalError:  # may need more exceptions here (or trap all)
+                    conn = engine.connect()  # replace your connection
+                    result = conn.execute(query)  # and retry
+        return result
+                            
+            
+    def    _isconnected(self):
+        if (self.dbConnp is None):
+            return 0
+        else:
+            return 1
+        
     def    metadb_nodes_getall(self, isResultDataFrame):
         psql_query = '''
              SELECT  * FROM gnmeta.gnnodes
