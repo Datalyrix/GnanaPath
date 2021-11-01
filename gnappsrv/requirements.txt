@@ -1,3 +1,4 @@
+chardet
 Flask
 Flask-Login
 flask_login
@@ -7,7 +8,9 @@ neo4j
 numexpr
 numpy
 pandas
+pyyaml
 sqlparse
+sqlalchemy
 tinydb
 WTForms
 flask_table
