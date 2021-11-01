@@ -88,6 +88,8 @@
     };
       
     console.log('View: Init called');
+      cy_nodes = 0;
+      cy_edges = 0;
     gnFetchMetaNodes();
       
     let prevLayout;
@@ -231,6 +233,7 @@
 		var statusmsg = data.statusmsg;
 		var gndata = data.gndata;
 		var nodelen = gndata.nodes.length;
+		var edgeslen = gndata.edges.length;
 
 
 		if (status == "ERROR") {
@@ -361,7 +364,7 @@
                .then (response => response.json())
                 .then (data => {
                      console.log('GNView: Fetch gnmeta nodes complete ');
-                     console.log('GNView: data:'+JSON.stringify(data, null,3));
+                     //console.log('GNView: data:'+JSON.stringify(data, null,3));
                     var status = data.status;
                     var nodelen;
 		    if (status == "ERROR") {
@@ -376,6 +379,7 @@
 		    ///$("#gnnode_selid").empty();
 		    ///$("#gnnode_selid").html("");
 		    nodelen = data.gndata.nodes.length;
+
 		    for (i=0; i < nodelen; i++) {
                         n = data.gndata.nodes[i];
 			if (n.nodetype == "GNMetaNode") {
