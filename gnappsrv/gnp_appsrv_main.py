@@ -7,25 +7,27 @@
 import os
 import sys
 import logging
+import pyspark
+from pyspark.sql import SparkSession
 
 curentDir = os.getcwd()
 listDir = curentDir.rsplit('/', 1)[0]
 sys.path.append(listDir)
 ###sys.path.append(listDir + '/gndatadis')
-import findspark
+#import findspark
 
-findspark.init()
+#findspark.init()
 
 from gndatadis.gndd_csv_load import gndwdbDataUpload  # to upload Files.
 from gnutils.get_config_file import get_config_neo4j_conninfo_file
 from gndwdb.gndwdb_neo4j_fetchops import gndwdb_metarepo_nodes_fetch_api, gndwdb_metarepo_edges_fetch_api
 from gnsearch.gnsrch_sql_srchops import gnsrch_sqlqry_api
 from gndwdb.gndwdb_neo4j_conn import gndwdb_neo4j_conn_check_api, gndwdb_neo4j_parse_config
-from gngraph.ingest.gngraph_ingest_main import gngraph_init
+###from gngraph.ingest.gngraph_ingest_main import gngraph_init
 from gndatadis.gndd_filedb_ops import gndd_filedb_insert_file_api, gndd_filedb_filelist_get
 from gndatadis.gndd_filelist_table import GNFileLogResults
-from gngraph.search.gngraph_search_main import gngrph_srch_metarepo_nodes_edges_fetch, gngrph_srch_datarepo_qry_fetch
-from gngraph.gngraph_dbops.gngraph_pgresdbops import GNGraphPgresDBOps
+from gngraph.search.gngraph_search_main import gngrph_search_init, gngrph_srch_metarepo_nodes_edges_fetch, gngrph_srch_datarepo_qry_fetch
+###from gngraph.gngraph_dbops.gngraph_pgresdbops import GNGraphPgresDBOps
 
 
 import flask
@@ -39,8 +41,8 @@ import json
 import re
 from connect_form import ConnectServerForm, LoginForm
 from collections import OrderedDict
-from gnp_db_ops import GNGraphDBConfigModel, GNGraphConfigModel
-import gn_config as gnconfig
+from gn_config import gn_config_init, gn_logging_init, gn_log, gn_log_err
+from gn_config import GNGraphConfigModel, GNGraphDBConfigModel
 from pathlib import Path
 import json
 import pathlib
@@ -48,9 +50,6 @@ from pyspark.sql import SparkSession
 
 
 # Append system path
-
-
-
 
 
 def dequote(s):
@@ -74,15 +73,14 @@ app.config['MAX_CONTENT_LENGTH'] = 256 * 1024 * 1024
 path = os.getcwd()
 
 app.config["gnRootDir"] = path.rsplit('/', 1)[0]
+### Intialize config directories and logging
+gn_config_init(app)
 
-gnconfig.gn_config_dirs(app)
-gnlogger = gnconfig.gn_logging_init(app, "GNPath")
-
+###gnlogger = gn_logging_init(app, "GNPath")
 
 # file Upload
 ###UPLOAD_FOLDER = os.path.join(path, 'uploads')
 UPLOAD_FOLDER = app.config["gnUploadsFolder"]
-
 
 # Make directory if uploads is not exists
 if not os.path.isdir(UPLOAD_FOLDER):
@@ -92,10 +90,26 @@ if not os.path.isdir(UPLOAD_FOLDER):
 ###app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 #### Initialize Spark Session
-gnGraphCls = gngraph_init(app.config["gnRootDir"])
+##gnGraphCls = gngraph_init(app.config["gnRootDir"])
 
 app_name="gngraph_spk"
-spark =SparkSession.builder.appName(app_name).getOrCreate()
+#spark = SparkSession.builder().appName(app_name).getOrCreate()
+##spark = SparkSession.builder.getOrCreate()
+
+#spark.stop()
+gn_log('GNPMain: Getting spark session' )
+gnp_spark = SparkSession \
+        .builder \
+        .appName("gnp") \
+        .config("spark.some.config.option", "some-value") \
+        .getOrCreate()
+
+gn_log(' Spark session acquired ')
+#sc = pyspark.SparkContext(appName=app_name)
+
+### Initialize GNGraph Sessions
+gnsrch_ops = gngrph_search_init(gnp_spark,   app.config["gnDataFolder"],  app.config["gnGraphDBCredsFolder"],  app.config["gncfg_settings"])
+
 
 # Allowed extension you can set your own
 ALLOWED_EXTENSIONS = set(['csv', 'json', ])
@@ -200,7 +214,7 @@ def check_server_session():
 
 @app.route("/gdbconfig", methods=['GET', 'POST'])
 @login_required
-def  gdb_config():
+def  gdb_config_settings_page():
 
     gdbcfg = GNGraphConfigModel(app.config["gnGraphDBCredsFolder"])
     gdbcfg_settings = gdbcfg.get_op()
@@ -401,7 +415,7 @@ def user_login():
 @login_required
 def gnview_cola_api():
     _srch = True if check_server_session() else False
-    gnlogger.info(' gnview cola is initiated')
+    gn_log(' gnview cola is initiated')
     return render_template('gnview/gnsrchview.html', disp_srch=_srch)
 
 @app.route('/api/v1/testdbconn', methods=['GET'])
@@ -451,31 +465,30 @@ def  testdb_conn():
 def gnsrch_api():
     verbose = 0
     srchqry = ''
-    gnlogger.info('gn search api initiated')
+    gn_log('gn search api initiated')
     # Get srchstring and then pass to search func
     if 'srchqry' in request.args:
         srchqry = request.args['srchqry']
-        gnlogger.info('GNSearch: search qry string:' + srchqry)
+        gn_log('GNSearch: search qry string:' + srchqry)
         # Remove "' begining and end
         srchqry_filtered = dequote(srchqry)
         slen = len(srchqry_filtered)
 
         # Let us invoke gnsrch api
-        gnlogger.info('GNPAppServer: search qry : ' + srchqry_filtered)
+        gn_log('GNPAppServer: search qry : ' + srchqry_filtered)
 
         # call gnsearch api
-        #res = gnsrch_sqlqry_api(srchqry_filtered, verbose)
+        #res = gngrph_srch_sqlqry_api(srchqry_filtered, verbose)
         gndata_folder=app.config["gnDataFolder"]
         gngraph_creds_folder=app.config["gnGraphDBCredsFolder"]
         ###res = gngrph_srch_metarepo_nodes_fetch(srchfilter, spark, gndata_folder, gngraph_creds_folder)
 
         
-        res = gngrph_srch_datarepo_qry_fetch(srchqry_filtered, spark, gndata_folder, gngraph_creds_folder)
-
+        res = gngrph_srch_datarepo_qry_fetch(gnsrch_ops, gnp_spark, srchqry_filtered)
         
         ###res_data = re.sub(r"(\w+):", r'"\1":', res)
-        gnlogger.info('GNPAppServer: Fetch Data Nodes with filter '+srchqry_filtered+' SUCCESS')
-        print('GNPAppServer: Fetch Data Nodes with filter '+srchqry_filtered+' SUCCESS')
+        gn_log('GNPAppServer: Fetch Data Nodes with filter '+srchqry_filtered+' SUCCESS')
+        gn_log('GNPAppServer: Fetch Data Nodes with filter '+srchqry_filtered+' SUCCESS')
         ##print(res)
 
 
@@ -529,11 +542,9 @@ def gnmetanodes_fetch_api():
 
     ##res = gndwdb_metarepo_nodes_fetch_api(verbose)
     srchfilter=""
-    gndata_folder=app.config["gnDataFolder"]
-    gngraph_creds_folder=app.config["gnGraphDBCredsFolder"]
-    res = gngrph_srch_metarepo_nodes_fetch(srchfilter, spark, gndata_folder, gngraph_creds_folder) 
+    res = gngrph_srch_metarepo_nodes_fetch(gnsrch_ops, gnp_spark, srchfilter) 
     ###res_data = re.sub(r"(\w+):", r'"\1":', res)
-    gnlogger.info('GNPAppServer:  metanode search  with filter '+srchfilter+'  SUCCESS : ')
+    gn_log('GNPAppServer:  metanode search  with filter '+srchfilter+'  SUCCESS : ')
     rjson = {
         "status": "SUCCESS",
         "data": res_data
@@ -550,7 +561,6 @@ def gnmetanodes_fetch_api():
 def gnmetaedges_fetch_api():
 
     verbose = 0
-    print('GNPAppserver: Meta edges search api ')
     # Get srchstring and then pass to search func
     if 'srchqry' in request.args:
         srchqry_raw = request.args['srchqry']
@@ -559,7 +569,7 @@ def gnmetaedges_fetch_api():
         srchqry = dequote(srchqry_raw)
 
         # Let us invoke gnsrch api
-        gnlogger.info('GNPAppServer: search qry for metanodes : ' + srchqry)
+        gn_log('GNPAppServer: search qry for metanodes : ' + srchqry)
 
     else:
         srchqry = ''
@@ -568,14 +578,11 @@ def gnmetaedges_fetch_api():
 
     ##res = gndwdb_metarepo_edges_fetch_api(srchqry, verbose)
     srchfilter=""
-    gndata_folder=app.config["gnDataFolder"]
-    gngraph_creds_folder=app.config["gnGraphDBCredsFolder"]
-    res = gngrph_srch_metarepo_nodes_edges_fetch(srchfilter, spark, gndata_folder, gngraph_creds_folder)
+
+    res = gngrph_srch_metarepo_nodes_edges_fetch(gnsrch_ops, gnp_spark, srchfilter)
     
     ##res_data = re.sub(r"(\w+):", r'"\1":', res)
-    gnlogger.info('GNPAppServer: metanodes and edges with filter '+srchfilter+' SUCCESS ')
-    ###print("GNEdges: ")
-    ####print(res)
+    gn_log('GNPAppServer: metanodes and edges with filter '+srchfilter+' SUCCESS ')
     
     rjson = {
         "status": "SUCCESS",
@@ -587,4 +594,5 @@ def gnmetaedges_fetch_api():
 
 
 if __name__ == '__main__':
+    
     app.run(host='0.0.0.0', port=5050, debug=True)
