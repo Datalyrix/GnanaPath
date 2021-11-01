@@ -212,10 +212,8 @@
                 console.log('GNView: Fetch complete ');
 	        /////console.log('GNView: data  nodes :'+JSON.stringify(data.gndata.nodes, null,3));
 		var status = data.status;
-		var statusmsg = data.statusmsg;
+	
 		
-		var nodelen = data.gndata.nodes.length;
-
 		if (status == "ERROR") {
                     console.log('GNView: Error status ');
                     errlbl.innerHTML = "Error getting data from database";
@@ -224,91 +222,102 @@
 		    return(gn_elements);
 		}
 		
-		nodes = '';	      
-		///s = '{'+"\n";
-		//nodes += ' '+"\n";
-		////console.log('GNView: fetch complete len:'+nodelen);
-		for (i=0; i < nodelen; i++) {
+		var statusmsg = data.statusmsg;		
+		var nodeslen = data.gndata.nodes.length;
+		var edgeslen = data.gndata.edges.length;
+		
+		if (nodeslen > 0 && edgeslen > 0) {
+		    nodes = '';	      
+		    ///s = '{'+"\n";
+		    //nodes += ' '+"\n";
+		    ////console.log('GNView: fetch complete len:'+nodelen);
+		    for (i=0; i < nodelen; i++) {
+			
+			if ( i > 0)
+			    nodes += ","+"\n";
+			
+			nodes += '{';
+			n = data.gndata.nodes[i];
+			nodes += '"data": {';
+			var idint = parseInt(n.id);
+			///console.log('GNView node-'+i+' id '+n.id);
+			nodes+= '"id": "n'+n.id+'", ';
+			nodes+= '"idInt": '+(idint)+',';
+			nodes+= '"name": "'+n.nodename+'", ';
+			nodes+= '"type": "'+n.nodetype+'", ';
+			nodes+= '"query": true ';
+			nodes+= '},'+"\n";
+			nodes+= '"group" : "nodes",'+"\n";
+			nodes+= '"removed": false,'+"\n";
+			nodes+= '"selected": false,'+"\n";
+			nodes+= '"selectable": true,'+"\n";
+			nodes+= '"grabbable": true,'+"\n";
+			nodes+= '"locked": false'+"\n";
+			nodes+= '}';
+		    }
 		    
-                    if ( i > 0)
-			nodes += ","+"\n";
+		    ///nodes += ']'+"\n";
+		    ////////// Get edges 
+		    //console.log('GNView: Fetch Edges complete ');
+		    //console.log('GNView: data:'+JSON.stringify(data, null,3));
+		    var edgeslen = data.gndata.edges.length;
 		    
-                    nodes += '{';
-		    n = data.gndata.nodes[i];
-                    nodes += '"data": {';
-                    var idint = parseInt(n.id);
-                    ///console.log('GNView node-'+i+' id '+n.id);
-                    nodes+= '"id": "n'+n.id+'", ';
-		    nodes+= '"idInt": '+(idint)+',';
-		    nodes+= '"name": "'+n.nodename+'", ';
-		    nodes+= '"type": "'+n.nodetype+'", ';
-		    nodes+= '"query": true ';
-                    nodes+= '},'+"\n";
-		    nodes+= '"group" : "nodes",'+"\n";
-		    nodes+= '"removed": false,'+"\n";
-		    nodes+= '"selected": false,'+"\n";
-		    nodes+= '"selectable": true,'+"\n";
-		    nodes+= '"grabbable": true,'+"\n";
-		    nodes+= '"locked": false'+"\n";
-		    nodes+= '}';
+		    edges = '';
+		    
+		    ///s = '{'+"\n";
+		    ///edges += '['+"\n";
+		    //console.log('GNView: fetch Edges complete len:'+nodelen);
+		    for (i=0; i < edgeslen; i++) {	  
+			if ( i > 0)
+			    edges += ",";
+			
+			edges += '{';
+			e = data.gndata.edges[i];
+			edges += '"data": {';
+			var idint = parseInt(e.id);
+			////console.log('GNView node-'+i+' id '+n.id);
+			edges += '"id": "e'+e.id+'", ';
+			edges += '"idInt": '+(idint)+',';
+			edges += '"relname": "'+(e.type)+'" ,';
+			edges += '"source": "n'+e.source+'" ,';
+			edges += '"target": "n'+e.target+'" ,';
+			edges += '"directed": true ';
+			////edges += '"name": "'+n.name+'", ';
+			////edges += '"query": true ';
+			edges += '},'+"\n";
+			
+			edges += '"position": {},';
+			edges += '"group": "edges",';
+			edges += '"removed": false,';
+			edges += '"selected": false,';
+			edges += '"selectable": true, ';
+			edges += '"locked": false, ';
+			edges += '"grabbable": true, ';
+			edges += '"directed": true';
+			edges += '}'+"\n";		   
+		    }
+		    
+		    ///edges += ']'+"\n";
+		    s = '['+"\n";
+		    ///////s += '{'+"\n";
+		    s += nodes;
+		    s += ','+"\n";
+		    s += edges;
+		    /////s += '}'+"\n";
+		    s += '\n';
+		    s += ']'+"\n";
+		    ////s += '}'+"\n";
+		    ///console.log('GNView nodes1 & edges:  '+s);
+		    gn_elements = JSON.parse(s);
+		    stlbl.innerHTML = "Data Upload Complete";
+		} else {
+		    gn_elements = {};
+		    stlbl.innerHTML = "Empty Metadata";
 		}
-		
-		///nodes += ']'+"\n";
-		////////// Get edges 
-		//console.log('GNView: Fetch Edges complete ');
-		//console.log('GNView: data:'+JSON.stringify(data, null,3));
-		var nodelen = data.gndata.edges.length;
-		
-		edges = '';
-		
-		///s = '{'+"\n";
-		///edges += '['+"\n";
-		//console.log('GNView: fetch Edges complete len:'+nodelen);
-		for (i=0; i < nodelen; i++) {	  
-		    if ( i > 0)
-			edges += ",";
 		    
-		    edges += '{';
-		    e = data.gndata.edges[i];
-	            edges += '"data": {';
-		    var idint = parseInt(e.id);
-		    ////console.log('GNView node-'+i+' id '+n.id);
-		    edges += '"id": "e'+e.id+'", ';
-		    edges += '"idInt": '+(idint)+',';
-		    edges += '"relname": "'+(e.type)+'" ,';
-		    edges += '"source": "n'+e.source+'" ,';
-		    edges += '"target": "n'+e.target+'" ,';
-		    edges += '"directed": true ';
-		    ////edges += '"name": "'+n.name+'", ';
-		    ////edges += '"query": true ';
-		    edges += '},'+"\n";
-		    
-                    edges += '"position": {},';
-		    edges += '"group": "edges",';
-		    edges += '"removed": false,';
-		    edges += '"selected": false,';
-		    edges += '"selectable": true, ';
-		    edges += '"locked": false, ';
-		    edges += '"grabbable": true, ';
-		    edges += '"directed": true';
-		    edges += '}'+"\n";		   
-		}
-		
-		///edges += ']'+"\n";
-		s = '['+"\n";
-		///////s += '{'+"\n";
-		s += nodes;
-		s += ','+"\n";
-		s += edges;
-		/////s += '}'+"\n";
-		s += '\n';
-		s += ']'+"\n";
-		////s += '}'+"\n";
-		///console.log('GNView nodes1 & edges:  '+s);
-		gn_elements = JSON.parse(s);
 		//gn_elements  = s;
 		console.log('GnanaMetaView: fetch process is completed');
-		stlbl.innerHTML = "Data Upload Complete";
+	
 		return (gn_elements);
 		////////////////////////////////
 		
