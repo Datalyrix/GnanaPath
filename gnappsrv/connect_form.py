@@ -30,6 +30,10 @@ class ConnectServerForm(FlaskForm):
     password = PasswordField('Password', validators=[DataRequired()])
     dbname = StringField('Database Name',
                          validators=[DataRequired()])
+    ##newdbchk=[(1, 'Create New Database')]
+    ##newdbchk = MultiCheckboxField('Label', choices=newdbchk)
+    #newdbchk = BooleanField('newdbchk', default="0")
+    newdbchk = BooleanField('newdbchk',  default="")
     connect = SubmitField('Save')
     testconn = SubmitField('Test Connection')
 
