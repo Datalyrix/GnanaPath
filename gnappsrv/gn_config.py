@@ -1,6 +1,7 @@
 import os
 import logging
 from tinydb import TinyDB, Query, where
+from tinydb.table import Document
 
 """
  gn_config Module : sets the directory and sets the config dir config vars
@@ -44,7 +45,8 @@ class GNGraphDBConfigModel:
         return "None_Insert"
     
     def upsert_op(self, req_dict):
-        self._db.upsert(req_dict, GNGraphDBConfigModel.query.serverIP == req_dict['serverIP'])    
+        ##self._db.upsert(req_dict, GNGraphDBConfigModel.query.serverIP == req_dict['serverIP'])
+        self._db.upsert(Document(req_dict, doc_id=1))
 
     def delete_op(self, req_dict):
         if self.search_op(req_dict):
@@ -53,8 +55,12 @@ class GNGraphDBConfigModel:
         return "None_Delete"
 
     def get_op(self):
+        ###return self._db.get(GNGraphDBConfigModel.query.id == 1)
         return self._db.get(doc_id=1)
     
+    def update_rec(self, req_dict):        
+      self._db.update({'serverIP': req_dict['serverIP'] , 'serverPort': req_dict['serverPort'], 'username': req_dict['username'], 'password': req_dict['password'], 'dbname': req_dict['dbname']}, GNGraphDBConfigModel.query.id == 1)
+
     def update_op(self, old_srv_IP, req_dict):
         if not self.search_res(old_srv_IP):
             return False
@@ -106,6 +112,12 @@ class GNGraphConfigModel:
             self.update_op(req_dict)
         return "None_Insert"
 
+    def upsert_op(self, req_dict):
+        ##self._db.upsert(req_dict, GNGraphDBConfigModel.query.serverIP == req_dict['serverIP'])
+        self._db.upsert(Document(req_dict, doc_id=1))
+
+    
+    
     def delete_op(self, req_dict):
         if self.search_op(req_dict):
             self._db.remove(where('serverIP') == req_dict['serverIP'])
