@@ -1,0 +1,138 @@
+{% extends "base_layout.html" %}
+{% block content %}
+     <div class="content-section">
+       <h5> GNGraph DBxxxx1 Settings </h5>
+       <hr>
+     </div>
+     
+     <div class="p-2">       
+	<form method="POST" action="">
+            {{ form.hidden_tag() }}	  
+	 
+
+
+
+  <div class="p-2">       
+	<form method="POST" action="">
+            <input id="csrf_token" name="csrf_token" type="hidden" value="ImQ0Y2JjOGI3MjE2YmYyOGViZDEyNzc5ZmIxZjU1ODJlZDAxNTk1NTEi.YYHN_Q.9-XgCkmtWXG3a90tAWPITL_gzdg">	  
+	 
+            <fieldset class="form-group">
+                <div class="form-group">
+		</div>
+                
+ 	      
+                <div class="form-group">
+                  <label class="form-control-label" for="serverIP">Graph DB server IP </label>
+
+                    
+                        <input class="form-control form-control-lg" id="serverIP" name="serverIP" required type="text" value="sss">
+                    
+                </div>
+
+		<div class="form-group">
+		  <label class="form-control-label" for="serverPort">Graph DB server Port</label>
+
+		  
+		  <input class="form-control form-control-lg" id="serverPort" name="serverPort" required type="text" value="">
+		  
+	      </div>
+		
+		
+              <div class="form-group">
+                    <label class="form-control-label" for="username">Username</label>
+                    
+                        <input class="form-control form-control-lg" id="username" name="username" required type="text" value="">
+                    
+                </div>
+                <div class="form-group">
+                    <label class="form-control-label" for="password">Password</label>
+                    
+                        <input class="form-control form-control-lg" id="password" name="password" required type="password" value="">
+                    
+                </div>
+
+		<div class="form-group">
+		  <label class="form-control-label" for="dbname">Database Name</label>
+		  
+		    <input class="form-control form-control-lg" id="dbname" name="dbname" required type="text" value="">
+		  
+		</div>
+		
+		
+		<div class="form-group">
+		  
+		    <label> Create new database if database does not exist </label>
+                    <input type="checkbox" name="newdbchk" id="newdbchk"></input>
+                </div>
+
+
+		
+            </fieldset>
+            <div class="form-group">
+              {{ form.connect(class="btn btn-outline-info") }}
+            </div>
+	         	    
+        </form>
+	
+	<button id="testbtn" class="btn btn-primary">Test DB Connection </button>
+	<label id="statuslbl"></label>
+	<hr>
+	 <label> Create new database if database does not exist </label>
+                  <input type="checkbox" name="newdbchk" id="newdbchk"></input>
+
+
+    </div>
+
+<script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+<script type="application/javascript">
+  $('#testbtn').on('click', function(event) {
+     var dbIP = document.getElementById('serverIP').value;
+     var dbPort = document.getElementById('serverPort').value;
+     var dbUser = document.getElementById('username').value;
+     var dbPasswd = document.getElementById('password').value;
+     var dbname = document.getElementById('dbname').value;
+     var stlbl = document.getElementById('statuslbl');
+     var tvars = "dbIP="+dbIP+"&dbPort="+dbPort+"&dbUser="+dbUser+"&dbPasswd="+dbPasswd+""+"&dbname="+dbname;
+
+     var dbtestUrl = "/api/v1/testdbconn?"+tvars; 
+  
+     console.log(' Test DB Connection: '+ dbtestUrl);
+
+     var myHeaders = new Headers({
+            'Content-Type': 'text/plain',
+            'Access-Control-Allow-Origin' : '*'
+     });
+
+      stlbl.innerHTML = "Testing  db connection...  ";
+
+      try {
+
+       return  fetch(dbtestUrl, { method: 'GET', headers: myHeaders })
+   
+              .then (response => response.json())
+              .then (data => {
+                    var status = data.status;
+                    var conn_status = data.connect_status; 
+
+                    console.log('DB connection status '+conn_status);
+  
+                    if (conn_status == 1) {
+                       console.log('DB connection is successful ');
+                       stlbl.innerHTML="Connection SUCCESS";
+                    } else {
+                       stlbl.innerHTML = "Connection FAILED";   
+                    }
+  
+              });
+               
+      } catch(error) {
+           console.log('Error caught '+error);
+  
+      }
+  
+  
+  });
+</script>
+
+
+{% endblock content %}
