@@ -64,7 +64,31 @@ Under Graph Config section, you can enable static file mode and db mode and also
 
 
 
+#### Setting up Postgres container
+You can run postgres as container and connect with GNPath
+
+#docker pull postgres:alpine
+
+# Run postgres container
+
+#docker run --name gnpgresdb -p 5432:5432 -e POSTGRES_USER=<PostgreUser> -e POSTGRES_PASSWORD=<PASSWORD> -d postgres:alpine
+
  
+#### Setup GNGraph DB on Postgres DB
+
+Now login into GNPath UI
+
+Go to "Graph Config" section. Click DB Setup
+
+You will go to GNGraph Postges DB Settings
+
+Enter Server IP (If you are using docker container, make sure you add host.docker.internal as Server IP or IP address of the host. if docker network is configured, you can add container name as hostname)
+
+and other credentials (port, username, and password)
+
+Under Database Name: You can create new Database for GNgraph or use existing database where the GNgraph schemas and tables are created.
+
+
 
 
 ***Now you are ready to upload the data*****
