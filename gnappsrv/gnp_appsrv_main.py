@@ -6,6 +6,7 @@
 #################################################################
 import os
 import sys
+import time
 import logging
 import pyspark
 from pyspark.sql import SparkSession
@@ -308,8 +309,15 @@ def pgresdb_config():
 
         if (newdbchk == 'y'):        
            pgresdb_ops = GNGraphPgresDBMgmtOps(req_dict['serverIP'], req_dict['serverPort'], req_dict['username'], req_dict['password'],  req_dict['dbname'], '')
-           pgresdb_ops.gngraph_db_initialize(req_dict['dbname'])  
-           gn_log('GNPAppSrv: pgres db initialized SUCCESS')
+           iscreatedb = 1
+           res = pgresdb_ops.gngraph_db_initialize(req_dict['dbname'], iscreatedb)
+           if (res < 0):
+               gn_log('GNPAppSrv: GNGraph DB Initialization failed ')
+               flash(f'Error Initializing GN Graph Database Please look into log file for errors','danger')
+               return render_template('pgres_db_setup.html', title='Graph DB Settings', form=form, disp_srch=False)
+           
+
+           gn_log('GNPAppSrv: GNGraph database initialized SUCCESS')
            
         pgres_conf.upsert_op(req_dict)
         res = "Success"
@@ -319,12 +327,12 @@ def pgresdb_config():
                 'danger')
             pgres_conf.delete_op(req_dict)
             return render_template(
-                'pgres_db_setup.hmtl', title='Graph DB Settings', form=form, disp_srch=False)
+                'pgres_db_setup.html', title='Graph DB Settings', form=form, disp_srch=False)
         else:
             session['serverIP'] = form.serverIP.data
             session['serverPort'] = form.serverPort.data
-            flash(f'Connected to server {form.serverIP.data}!', 'success')
-            return redirect(url_for('gn_home', disp_srch=True))
+            flash(f'GNGraph database settings has been saved', 'success')
+            return redirect(url_for('gdb_config_settings_page', disp_srch=True))
       else:
          print('Pgres Conf: Error in form submit')
          flash(f'Error on submit ', form.errors)         
@@ -461,10 +469,10 @@ def  testdb_conn():
     else:
         newdb = 0
         
-    print('new db val '+str(newdb))
-    print('Test DB Connection dbIP '+dbIP+"  port "+dbPort)
+    gn_log('new db val '+str(newdb))
+    gn_log('Test DB Connection dbIP '+dbIP+"  port "+dbPort)
     if ((dbIP == '') or dbPort == '' or dbUser == '' or dbPasswd == ''):
-           print('DBTestConn: Invalid args ')
+           gn_log('GNPAppSrv: DB TestConn: Invalid args ')
            rjson = {
               "status": "FAIL",
                "connect_status": 0,
@@ -625,6 +633,19 @@ def gnmetaedges_fetch_api():
 
     # return json.JSONDecoder(object_pairs_hook=OrderedDict).decode()
     return rjson
+
+
+@app.route('/gnlog')
+def gn_log_stream():
+    def generate():
+        with open(app.config["gnLogFilePath"]) as f:
+            content= f.read()
+            ##while True:
+            ##    yield f.read()
+            ##    time.sleep(10)
+        return content    
+    return app.response_class(generate(), mimetype='text/plain')
+
 
 
 if __name__ == '__main__':
