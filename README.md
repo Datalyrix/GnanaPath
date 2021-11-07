@@ -23,7 +23,6 @@ The framework can be execute as part of docker containers
 
 <h4> Setup using Dockerfile </h4>
 
-
  After checking out repo. Go to the local repo directory
 
 cd GnanaPath
@@ -32,7 +31,11 @@ for pyspark-based container:
 
 \$ ln -s Dockerfile.pyspark Dockerfile
 
-\# run docker build
+\# run docker build and run container
+# sh ./gn_docker_create_run.sh
+
+or run step-by-step commands
+
 \# docker build -t gnpath .
 
 After the docker image is created run the image
@@ -43,11 +46,22 @@ After that open browser http://<dockerhostip>:5050
 
 Login/passwd: gnadmin/gnana
 
+## To clean up container
+sh ./gn_docker_cleanup.sh
 
 
 
+##  GNGraph Storage
+Currently gnpath supports storage  as static files and/or backend database using postgres
 
-COMING UP: Setting Postgres DB for backendstorage
+By default, the static files storage is always turned on.
+
+To enable database mode, you will need to setup postgres database.
+
+Under Graph Config section, you can enable static file mode and db mode and also setup database configuration.
+
+
+
 
 
  
