@@ -173,7 +173,8 @@ def        gn_config_init(app):
    
     app.config["gnLogDir"] = app.config["gnRootDir"]+"/gnlog"
     app.config["gnLogFile"] = "gnpath.log"
-
+    app.config["gnLogFilePath"] = app.config["gnLogDir"]+"/"+app.config["gnLogFile"]
+    
     ###Read Config settings
     gncfg = GNGraphConfigModel(app.config["gnGraphDBCredsFolder"])
     
