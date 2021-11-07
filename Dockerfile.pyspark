@@ -11,7 +11,6 @@ COPY --from=py3 / /
 ARG PYSPARK_VERSION=3.1.2
 RUN pip --no-cache-dir install pyspark==${PYSPARK_VERSION}
 
-
 LABEL maintainer="gnanapath project"
 EXPOSE 5050
 USER root
@@ -32,10 +31,9 @@ COPY gndwdb/ gndwdb/
 COPY gnsearch/ gnsearch/
 COPY gnutils/  gnutils/
 COPY creds/ creds/
-COPY Jenkinsfile Jenkinsfile
 COPY startgnpath.sh startgnpath.sh
 WORKDIR gnappsrv/
 RUN pip install -r requirements.txt
 
 
-ENTRYPOINT ["python"]
+CMD ["python", "gnp_appsrv_main.py"]
