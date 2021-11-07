@@ -4,6 +4,7 @@ import json
 import pandas as pds
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT # Need for CREATE DATABASE
 from psycopg2 import sql
+from gnappsrv.gn_config import gn_log
 
 """
 gngraph db implementation main class and associated functions
@@ -344,62 +345,77 @@ class       GNGraphPgresDBMgmtOps:
 
             con.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT) # <-- ADD THIS LINE         
             cur = con.cursor()
-         
             # Use the psycopg2.sql module instead of string concatenation 
             # in order to avoid sql injection attacs.
-            cur.execute(sql.SQL("CREATE DATABASE IF NOT EXISTS {}").format(
+            # Psql does not support IF NOT EXISTS for database
+            ##sql_cmd="SELECT 'CREATE DATABASE "+newdbname+"' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '"+newdbname+"')\gexec"
+            cur.execute(sql.SQL("CREATE DATABASE {}").format(
                        sql.Identifier(newdbname))
                       )
+            ###cur.execute(sql.SQL(sql_cmd))
             con.close()
             return 0
-       except:
-           print("ERROR ")
+       except psycopg2.OperationalError as err:
+           gn_log(" CREATE DATABASE ERROR ")
+           gn_log(err)
+           return -1
+       except psycopg2.Error as err:
+           gn_log('CREATE DATABASE ERROR  ')
+           gn_log(err)
            return -1
         
-    def   gngraph_db_initialize(self, newdbname):
+    def   gngraph_db_initialize(self, newdbname, iscreatedb):
 
+        gn_log('GNGraphDBInit: Initializing Graph on database '+newdbname)
         ## First check connecting to postgres
         self.dbname = "postgres"
-
-        connected = self.db_connect()
-        if (connected == 0):
-            print('GNGraphDBInit: Failed to connect to DB ')
-            return -1
+        
+        ##connected = self.db_connect()
+        ##if (connected == 0):
+        ##    print('GNGraphDBInit: ERROR Failed to connect to DB ')
+        ##    return -1
 
         ## first create gngraph
-        res = self.db_create_database(newdbname)
+        if (iscreatedb == 1):
+          res = self.db_create_database(newdbname)
 
-        if (res < 0):
-            print('GNGraphDBInit: Failed to create new database')
-
+          if (res < 0):
+               gn_log('GNGraphDBInit: ERROR Failed to create new database : '+newdbname)
+               return res
+          gn_log('GNGraphDBInit: database '+newdbname+' is created ')
+          
         ## Now connect using new database
         self.dbname = newdbname
-
         connected = self.db_connect()
         if (connected == 0):
-            print('GNGraphDBInit: Failed to connect new database:'+newdbname)
+            gn_log('GNGraphDBInit: Failed to connect new database:'+newdbname)
             return -1
-        
+    
         ### create schema
         self.db_create_schema(newdbname, "gnmeta")
-
+        gn_log('GNGraphDBInit: gnmeta schema created ')
         
         gnnode_tablestr = "CREATE TABLE IF NOT EXISTS gnmeta.gnnodes (gnnodeid bigint NOT NULL PRIMARY KEY, gnnodename text, gnnodetype text, gnnodeprop json, uptmstmp timestamp);"
-        print('GNPgreDBMgmtOps: create table '+gnnode_tablestr) 
+        #print('GNPgreDBMgmtOps: create table '+gnnode_tablestr) 
         self.db_create_table(gnnode_tablestr)
+        gn_log('GNGraphDBInit: table gnnodes is created ')
         
         gnedge_tablestr = "CREATE TABLE IF NOT EXISTS gnmeta.gnedges ( gnedgeid bigint NOT NULL PRIMARY KEY, gnedgename text, gnedgetype text, gnsrcnodeid bigint,  gntgtnodeid bigint, gnedgeprop json, uptmstmp timestamp);"
-        print('GNPgreDBMgmtOps: create table '+gnedge_tablestr)
+        ##print('GNPgreDBMgmtOps: create table '+gnedge_tablestr)
         self.db_create_table(gnedge_tablestr)
-
+        gn_log('GNGraphDBInit: table gnedges is created ')
+        
         gnbizrules_tablestr = "CREATE TABLE IF NOT EXISTS gnmeta.gnbizrules ( gnrelid bigint NOT NULL PRIMARY KEY, gnrelname text, gnreltype text, gnsrcnodeid  bigint, gntgtnodeid  bigint, gnmatchnodeid bigint, gnrelprop json, gnrelobj json, state text, freq text, uptmstmp  timestamp);"
-        print('GNPgreDBMgmtOps: create table '+gnbizrules_tablestr)
+        #print('GNPgreDBMgmtOps: create table '+gnbizrules_tablestr)
         self.db_create_table(gnbizrules_tablestr)
-
+        gn_log('GNGraphDBInit: table gnbizrules is created ')
+        
         ## Create default Business Domains
         self.db_create_schema(newdbname, "CUSTOMER_DOMAIN")
         self.db_create_schema(newdbname, "PRODUCT_DOMAINd")
         self.db_create_schema(newdbname, "SALES_DOMAIN")
-
+        gn_log('GNGraphDBInit: schemas CUSTOMER_DOMAIN, PRODUCT_DOMAIN, SALES_DOMAIN are created ')
+        gn_log('GNGraphDBInit: GNGraph Intialization Successful ')
+        return 0
 
 
