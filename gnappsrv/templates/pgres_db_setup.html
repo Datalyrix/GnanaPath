@@ -1,8 +1,7 @@
 {% extends "base_layout.html" %}
 {% block content %}
-
      <div class="content-section">
-       <h5> GNGraph2 DB Settings </h5>
+       <h5> GNGraph Postgres DB Settings </h5>
        <hr>
      </div>
      
@@ -15,8 +14,7 @@
 		</div>
                 
  	      
-                <div class="form-group">    
-
+                <div class="form-group">
                     {{ form.serverIP.label(class="form-control-label") }}
 
                     {% if form.serverIP.errors %}
@@ -45,7 +43,8 @@
 		  {{ form.serverPort(class="form-control form-control-lg") }}
 		  {% endif %}
 	      </div>
-
+		
+		
               <div class="form-group">
                     {{ form.username.label(class="form-control-label") }}
                     {% if form.username.errors %}
@@ -75,6 +74,7 @@
 
 		<div class="form-group">
 		  {{ form.dbname.label(class="form-control-label") }}
+
 		  {% if form.dbname.errors %}
 		     {{ form.dbname(class="form-control form-control-lg is-invalid") }}
 		  <div class="invalid-feedback">
@@ -87,24 +87,77 @@
 		  {% endif %}
 		</div>
 		
-
-
+		<div class="form-group">
+		    <!-- <input type="hidden" name="newdbchk" value="n">  -->
+		    {{ form.newdbchk }}
+		    <label> Check to create new Database  </label>
+                </div>
 		
             </fieldset>
+	    <hr>
             <div class="form-group">
               {{ form.connect(class="btn btn-outline-info") }}
             </div>
 	         	    
         </form>
-	 <button id="testbtn" class="btn btn-primary">Test DB Connection </button>
+	<button id="testbtn" class="btn btn-primary">Test DB Connection </button>
+	<label id="statuslbl"></label>
+	<hr>
+	
+
     </div>
 
 <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
 <script type="application/javascript">
   $('#testbtn').on('click', function(event) {
-     var dbIP = document.getElement
-    console.log(' Button clicked ')
+     var dbIP = document.getElementById('serverIP').value;
+     var dbPort = document.getElementById('serverPort').value;
+     var dbUser = document.getElementById('username').value;
+     var dbPasswd = document.getElementById('password').value;
+     var dbname = document.getElementById('dbname').value;
+     var newdbchk = document.getElementById('newdbchk').checked;
+     var stlbl = document.getElementById('statuslbl');
+     var tvars = "dbIP="+dbIP+"&dbPort="+dbPort+"&dbUser="+dbUser+"&dbPasswd="+dbPasswd+""+"&dbname="+dbname+"&newdbchk="+newdbchk;
+
+     var dbtestUrl = "/api/v1/testdbconn?"+tvars; 
+  
+     console.log(' Test DB Connection: '+ dbtestUrl);
+
+     var myHeaders = new Headers({
+            'Content-Type': 'text/plain',
+            'Access-Control-Allow-Origin' : '*'
+     });
+
+      stlbl.innerHTML = "Testing  db connection...  ";
+
+      try {
+
+       return  fetch(dbtestUrl, { method: 'GET', headers: myHeaders })
+   
+              .then (response => response.json())
+              .then (data => {
+                    var status = data.status;
+                    var conn_status = data.connect_status; 
+
+                    console.log('DB connection status '+conn_status);
+  
+                    if (conn_status == 1) {
+                       console.log('DB connection is successful ');
+                       stlbl.innerHTML="Connection SUCCESS";
+                    } else {
+                       stlbl.innerHTML = "Connection FAILED";   
+                    }
+  
+              });
+               
+      } catch(error) {
+           console.log('Error caught '+error);
+  
+      }
+  
+  
   });
 </script>
+
 
 {% endblock content %}

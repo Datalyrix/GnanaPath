@@ -6,22 +6,30 @@
 #################################################################
 import os
 import sys
+import time
 import logging
+import pyspark
+from pyspark.sql import SparkSession
 
 curentDir = os.getcwd()
 listDir = curentDir.rsplit('/', 1)[0]
 sys.path.append(listDir)
 ###sys.path.append(listDir + '/gndatadis')
+#import findspark
+
+#findspark.init()
 
 from gndatadis.gndd_csv_load import gndwdbDataUpload  # to upload Files.
 from gnutils.get_config_file import get_config_neo4j_conninfo_file
 from gndwdb.gndwdb_neo4j_fetchops import gndwdb_metarepo_nodes_fetch_api, gndwdb_metarepo_edges_fetch_api
 from gnsearch.gnsrch_sql_srchops import gnsrch_sqlqry_api
 from gndwdb.gndwdb_neo4j_conn import gndwdb_neo4j_conn_check_api, gndwdb_neo4j_parse_config
-from gngraph.ingest.gngraph_ingest_main import gngraph_init
+
+###from gngraph.ingest.gngraph_ingest_main import gngraph_init
 from gndatadis.gndd_filedb_ops import gndd_filedb_insert_file_api, gndd_filedb_filelist_get
 from gndatadis.gndd_filelist_table import GNFileLogResults
-from gngraph.search.gngraph_search_main import gngrph_srch_metarepo_nodes_edges_fetch, gngrph_srch_datarepo_qry_fetch
+from gngraph.search.gngraph_search_main import gngrph_search_init, gngrph_srch_metarepo_nodes_edges_fetch, gngrph_srch_datarepo_qry_fetch
+from gngraph.gngraph_dbops.gngraph_pgresdbops import GNGraphPgresDBOps, GNGraphPgresDBMgmtOps
 
 import flask
 from flask import request, jsonify, request, redirect, render_template, flash, url_for, session, Markup, abort
@@ -34,18 +42,15 @@ import json
 import re
 from connect_form import ConnectServerForm, LoginForm
 from collections import OrderedDict
-from gnp_db_ops import ConnectModel
-import gn_config as gnconfig
+
+from gn_config import gn_config_init, gn_logging_init, gn_log, gn_log_err
+from gn_config import GNGraphConfigModel, GNGraphDBConfigModel
 from pathlib import Path
 import json
 import pathlib
 from pyspark.sql import SparkSession
 
-
 # Append system path
-
-
-
 
 
 def dequote(s):
@@ -69,10 +74,10 @@ app.config['MAX_CONTENT_LENGTH'] = 256 * 1024 * 1024
 path = os.getcwd()
 
 app.config["gnRootDir"] = path.rsplit('/', 1)[0]
+### Intialize config directories and logging
+gn_config_init(app)
 
-gnconfig.gn_config_dirs(app)
-gnlogger = gnconfig.gn_logging_init(app, "GNPath")
-
+###gnlogger = gn_logging_init(app, "GNPath")
 
 # file Upload
 ###UPLOAD_FOLDER = os.path.join(path, 'uploads')
@@ -87,10 +92,27 @@ if not os.path.isdir(UPLOAD_FOLDER):
 ###app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 #### Initialize Spark Session
-gnGraphCls = gngraph_init(app.config["gnRootDir"])
+
+##gnGraphCls = gngraph_init(app.config["gnRootDir"])
 
 app_name="gngraph_spk"
-spark =SparkSession.builder.appName(app_name).getOrCreate()
+#spark = SparkSession.builder().appName(app_name).getOrCreate()
+##spark = SparkSession.builder.getOrCreate()
+
+#spark.stop()
+gn_log('GNPMain: Getting spark session' )
+gnp_spark = SparkSession \
+        .builder \
+        .appName("gnp") \
+        .config("spark.some.config.option", "some-value") \
+        .getOrCreate()
+
+gn_log(' Spark session acquired ')
+#sc = pyspark.SparkContext(appName=app_name)
+
+### Initialize GNGraph Sessions
+gnsrch_ops = gngrph_search_init(gnp_spark,   app.config["gnDataFolder"],  app.config["gnGraphDBCredsFolder"],  app.config["gncfg_settings"])
+
 
 # Allowed extension you can set your own
 ALLOWED_EXTENSIONS = set(['csv', 'json', ])
@@ -193,39 +215,136 @@ def check_server_session():
     return True if 'serverIP' in session else False
 
 
-@app.route("/connect", methods=['GET', 'POST'])
+@app.route("/gdbconfig", methods=['GET', 'POST'])
 @login_required
-def connect_server():
+def  gdb_config_settings_page():
+    
+    gdbcfg = GNGraphConfigModel(app.config["gnGraphDBCredsFolder"])
+    gdbcfg_settings = gdbcfg.get_op()
+    if gdbcfg_settings is None:
+       gdbcfg_settings = {} 
+       gdbcfg_settings['sfmode'] = 1
+       gdbcfg_settings['dbmode'] = 0
+    print(gdbcfg_settings)
+    pgres_c = GNGraphDBConfigModel(app.config["gnGraphDBCredsFolder"])
+    pgres_conf = pgres_c.get_op()
+    print(pgres_conf)
+    #if (request.method == 'GET'):
+        
+    if (request.method == 'POST'):
+        print('GB Config POST')
+        in_vars = request.form.to_dict()
+        print(in_vars)
+        cfg_setting = gdbcfg_settings
+        if ('sfmode' in in_vars):
+            print('GNGraphDB: sfmode '+in_vars['sfmode'])
+            if (in_vars['sfmode'] == 'on'):
+                cfg_setting['sfmode'] = 1
+            else:
+                cfg_setting['sfmode'] = 0
+
+        if ('dbmode' in in_vars):
+            print('GNGraphDB: sfmode '+in_vars['sfmode'])
+            if (in_vars['dbmode'] == 'on'):
+                cfg_setting['dbmode'] = 1
+            else:
+                cfg_setting['dbmode'] = 0
+
+        print('Insert settings ')
+        print(cfg_setting)
+        ##gdbcfg.insert_op(cfg_setting)
+        gdbcfg.upsert_op(cfg_setting)
+        return redirect(url_for('gn_home'))    
+          
+    return render_template('gdb_config.html', title='Gnana Graph Server Config', cfg=gdbcfg_settings, pgres_conf=pgres_conf)
+   
+
+@app.route("/pgresdb_conf", methods=['GET', 'POST'])
+@login_required
+def pgresdb_config():
 
     form = ConnectServerForm()
-    connect = ConnectModel(path)
+    pgres_conf = GNGraphDBConfigModel(app.config["gnGraphDBCredsFolder"])
+    conf_settings = GNGraphConfigModel(app.config["gnGraphDBCredsFolder"])
+    conn = {}
+    if (request.method == 'GET'):
+        
+       #if 'serverIP' in session and connect.search_res(session['serverIP']):
+        conn = pgres_conf.get_op()
+        print('app srv: ')
+        print(conn)
+        
+        if conn :
+          srv_ip_encode = base64.urlsafe_b64encode(
+            conn['serverIP'].encode("utf-8"))
+          srv_encode_str = str(srv_ip_encode, "utf-8")
+          print('pgresConfForm: session ')
+          ##conn['serverIP'] = session['serverIP']
+          ##conn['serverPort'] = session['serverPort']
+          ##conn['user_id'] = session['_user_id']
+          form.serverIP.data = conn['serverIP']
+          form.serverPort.data = conn['serverPort']
+          form.username.data = conn['username']
+          form.dbname.data = conn['dbname']
+          ##print(conn)
+          #flash(Markup('Connected to db server {},Click <a href=/modify/{}\
+          #     class="alert-link"> here</a> to modify'.format(session['serverIP'], srv_encode_str)), 'info')
+          #return redirect(url_for('gn_home', disp_srch=True))
 
-    if 'serverIP' in session and connect.search_res(session['serverIP']):
-
-        srv_ip_encode = base64.urlsafe_b64encode(
-            session['serverIP'].encode("utf-8"))
-        srv_encode_str = str(srv_ip_encode, "utf-8")
-        flash(Markup('Connected to db server {},Click <a href=/modify/{}\
-             class="alert-link"> here</a> to modify'.format(session['serverIP'], srv_encode_str)), 'info')
-        return redirect(url_for('gn_home', disp_srch=True))
-    if form.validate_on_submit():
+        return render_template('pgres_db_setup.html', title='Connect Graph Server', form=form, disp_srch=False, cfg=conn)
+    
+    if (request.method == 'POST'):
+      print('pgres_db_conf: POST method input vars')
+      in_vars = request.form.to_dict()
+      print(in_vars)
+      
+      if 'newdbchk' in in_vars:
+          newdbchk = in_vars['newdbchk']
+          if (newdbchk == 'y'):
+               print('new db check '+newdbchk)
+      else:
+          newdbchk = 'n'
+          
+      if 1 or form.validate_on_submit():
         result = request.form.to_dict()
-        req_dict = connect.req_fields_json(result)
-        connect.insert_op(req_dict)
-        res = neo4j_conn_check_api()
+        req_dict = pgres_conf.req_fields_json(result)
+        print('DBConfig: POST ')
+        print(req_dict)
+
+        if (newdbchk == 'y'):        
+           pgresdb_ops = GNGraphPgresDBMgmtOps(req_dict['serverIP'], req_dict['serverPort'], req_dict['username'], req_dict['password'],  req_dict['dbname'], '')
+           iscreatedb = 1
+           res = pgresdb_ops.gngraph_db_initialize(req_dict['dbname'], iscreatedb)
+           if (res < 0):
+               gn_log('GNPAppSrv: GNGraph DB Initialization failed ')
+               flash(f'Error Initializing GN Graph Database Please look into log file for errors','danger')
+               return render_template('pgres_db_setup.html', title='Graph DB Settings', form=form, disp_srch=False)
+           
+
+           gn_log('GNPAppSrv: GNGraph database initialized SUCCESS')
+           
+        pgres_conf.upsert_op(req_dict)
+        res = "Success"
         if res == "Error":
             flash(
                 f'Error connecting to db server {form.serverIP.data}',
                 'danger')
-            connect.delete_op(req_dict)
+            pgres_conf.delete_op(req_dict)
             return render_template(
-                'connect.html', title='Connect Graph Server', form=form, disp_srch=False)
+                'pgres_db_setup.html', title='Graph DB Settings', form=form, disp_srch=False)
         else:
             session['serverIP'] = form.serverIP.data
-            flash(f'Connected to server {form.serverIP.data}!', 'success')
-            return redirect(url_for('gn_home', disp_srch=True))
-    return render_template(
-        'connect_db.html', title='Connect Graph Server', form=form, disp_srch=False)
+
+            session['serverPort'] = form.serverPort.data
+            flash(f'GNGraph database settings has been saved', 'success')
+            return redirect(url_for('gdb_config_settings_page', disp_srch=True))
+      else:
+         print('Pgres Conf: Error in form submit')
+         flash(f'Error on submit ', form.errors)         
+         return render_template('pgres_db_setup.html', title='Connect Graph Server', form=form,  disp_srch=False)
+        
+    ##return render_template(
+      ##  'connect_db.html', title='Connect Graph Server', form=form, disp_srch=False)         
 
 
 @app.route("/modify/<serverIP>", methods=['GET', 'POST'])
@@ -256,7 +375,7 @@ def modify_conn_details(serverIP):
             res = neo4j_conn_check_api()
             if res == "Error":
                 flash(
-                    f'Error connecting to neo4j server {form.serverIP.data}',
+                    f'Error connecting to db server {form.serverIP.data}',
                     'danger')
                 form.connect.label.text = 'Update'
                 connect.delete_op(req_dict)
@@ -305,7 +424,7 @@ def user_login():
         _srch = False
         connect = ConnectModel(path)
         connect._db.truncate()
-        flash("Error connecting to neo4j server", 'danger')
+        flash("Error connecting to db server", 'danger')
         return redirect(url_for('connect_server', disp_srch=_srch))
     _srch = True
     cfg_file = get_config_neo4j_conninfo_file()
@@ -318,44 +437,105 @@ def user_login():
 @login_required
 def gnview_cola_api():
     _srch = True if check_server_session() else False
-    gnlogger.info(' gnview cola is initiated')
+    gn_log(' gnview cola is initiated')
     return render_template('gnview/gnsrchview.html', disp_srch=_srch)
 
+@app.route('/api/v1/testdbconn', methods=['GET'])
+@login_required
+def  testdb_conn():
 
+    dbIP=''
+    dbPort=''
+    dbUser=''
+    dbPasswd=''
+    dbname=''
+    if 'dbIP' in request.args:
+      dbIP = request.args['dbIP']
+    
+    if 'dbPort' in request.args:   
+      dbPort = request.args['dbPort']
+      
+    if 'dbUser' in request.args:
+      dbUser = request.args['dbUser']
+
+    if 'dbPasswd' in request.args:  
+      dbPasswd = request.args['dbPasswd']
+
+    if 'dbname' in request.args:  
+      dbname = request.args['dbname']
+
+    if 'newdbchk' in request.args:
+        newdbchk = request.args['newdbchk']
+        if (newdbchk == 'true'):
+            newdb = 1
+        else:
+            newdb = 0
+    else:
+        newdb = 0
+        
+    gn_log('new db val '+str(newdb))
+    gn_log('Test DB Connection dbIP '+dbIP+"  port "+dbPort)
+    if ((dbIP == '') or dbPort == '' or dbUser == '' or dbPasswd == ''):
+           gn_log('GNPAppSrv: DB TestConn: Invalid args ')
+           rjson = {
+              "status": "FAIL",
+               "connect_status": 0,
+               "statusmsg": "Invalid Input Arguments"
+              }
+           return jsonify(rjson)
+
+    if (newdb == 1):        
+        pgdb_cls = GNGraphPgresDBOps(dbIP, dbPort, dbUser, dbPasswd,  "postgres", "")
+    else:
+        if (dbname):
+           pgdb_cls = GNGraphPgresDBOps(dbIP, dbPort, dbUser, dbPasswd,  dbname, "") 
+        else:
+           print('DBTestConn: dbname not provided for testing ')
+           rjson = {
+              "status": "FAIL",
+               "connect_status": 0,
+               "statusmsg": "Database name for testing not provided"
+              }
+           return jsonify(rjson)
+
+    is_connect = pgdb_cls._isconnected()
+    rjson = {
+        "status": "SUCCESS",
+        "connect_status": is_connect
+    }
+    
+    return jsonify(rjson)
+    
 @app.route('/api/v1/search', methods=['GET'])
 @login_required
 def gnsrch_api():
     verbose = 0
     srchqry = ''
-    gnlogger.info('gn search api initiated')
+    gn_log('gn search api initiated')
     # Get srchstring and then pass to search func
     if 'srchqry' in request.args:
         srchqry = request.args['srchqry']
-        gnlogger.info('GNSearch: search qry string:' + srchqry)
+        gn_log('GNSearch: search qry string:' + srchqry)
         # Remove "' begining and end
         srchqry_filtered = dequote(srchqry)
         slen = len(srchqry_filtered)
 
         # Let us invoke gnsrch api
-        gnlogger.info('GNPAppServer: search qry : ' + srchqry_filtered)
+        gn_log('GNPAppServer: search qry : ' + srchqry_filtered)
 
         # call gnsearch api
-        #res = gnsrch_sqlqry_api(srchqry_filtered, verbose)
+        #res = gngrph_srch_sqlqry_api(srchqry_filtered, verbose)
         gndata_folder=app.config["gnDataFolder"]
         gngraph_creds_folder=app.config["gnGraphDBCredsFolder"]
         ###res = gngrph_srch_metarepo_nodes_fetch(srchfilter, spark, gndata_folder, gngraph_creds_folder)
 
         
-        res = gngrph_srch_datarepo_qry_fetch(srchqry_filtered, spark, gndata_folder, gngraph_creds_folder)
-
+        res = gngrph_srch_datarepo_qry_fetch(gnsrch_ops, gnp_spark, srchqry_filtered)
         
         ###res_data = re.sub(r"(\w+):", r'"\1":', res)
-        gnlogger.info('GNPAppServer: Fetch Data Nodes with filter '+srchqry_filtered+' SUCCESS')
-        print('GNPAppServer: Fetch Data Nodes with filter '+srchqry_filtered+' SUCCESS')
+        gn_log('GNPAppServer: Fetch Data Nodes with filter '+srchqry_filtered+' SUCCESS')
+        gn_log('GNPAppServer: Fetch Data Nodes with filter '+srchqry_filtered+' SUCCESS')
         ##print(res)
-
-
-        
         ##res = {}
         ##res_data = re.sub(r"(\w+):", r'"\1":', res)
 
@@ -405,11 +585,9 @@ def gnmetanodes_fetch_api():
 
     ##res = gndwdb_metarepo_nodes_fetch_api(verbose)
     srchfilter=""
-    gndata_folder=app.config["gnDataFolder"]
-    gngraph_creds_folder=app.config["gnGraphDBCredsFolder"]
-    res = gngrph_srch_metarepo_nodes_fetch(srchfilter, spark, gndata_folder, gngraph_creds_folder) 
+    res = gngrph_srch_metarepo_nodes_fetch(gnsrch_ops, gnp_spark, srchfilter) 
     ###res_data = re.sub(r"(\w+):", r'"\1":', res)
-    gnlogger.info('GNPAppServer:  metanode search  with filter '+srchfilter+'  SUCCESS : ')
+    gn_log('GNPAppServer:  metanode search  with filter '+srchfilter+'  SUCCESS : ')
     rjson = {
         "status": "SUCCESS",
         "data": res_data
@@ -426,7 +604,6 @@ def gnmetanodes_fetch_api():
 def gnmetaedges_fetch_api():
 
     verbose = 0
-    print('GNPAppserver: Meta edges search api ')
     # Get srchstring and then pass to search func
     if 'srchqry' in request.args:
         srchqry_raw = request.args['srchqry']
@@ -435,7 +612,7 @@ def gnmetaedges_fetch_api():
         srchqry = dequote(srchqry_raw)
 
         # Let us invoke gnsrch api
-        gnlogger.info('GNPAppServer: search qry for metanodes : ' + srchqry)
+        gn_log('GNPAppServer: search qry for metanodes : ' + srchqry)
 
     else:
         srchqry = ''
@@ -444,14 +621,10 @@ def gnmetaedges_fetch_api():
 
     ##res = gndwdb_metarepo_edges_fetch_api(srchqry, verbose)
     srchfilter=""
-    gndata_folder=app.config["gnDataFolder"]
-    gngraph_creds_folder=app.config["gnGraphDBCredsFolder"]
-    res = gngrph_srch_metarepo_nodes_edges_fetch(srchfilter, spark, gndata_folder, gngraph_creds_folder)
+    res = gngrph_srch_metarepo_nodes_edges_fetch(gnsrch_ops, gnp_spark, srchfilter)
     
     ##res_data = re.sub(r"(\w+):", r'"\1":', res)
-    gnlogger.info('GNPAppServer: metanodes and edges with filter '+srchfilter+' SUCCESS ')
-    ###print("GNEdges: ")
-    ####print(res)
+    gn_log('GNPAppServer: metanodes and edges with filter '+srchfilter+' SUCCESS ')
     
     rjson = {
         "status": "SUCCESS",
@@ -461,6 +634,17 @@ def gnmetaedges_fetch_api():
     # return json.JSONDecoder(object_pairs_hook=OrderedDict).decode()
     return rjson
 
+@app.route('/gnlog')
+def gn_log_stream():
+    def generate():
+        with open(app.config["gnLogFilePath"]) as f:
+            content= f.read()
+            ##while True:
+            ##    yield f.read()
+            ##    time.sleep(10)
+        return content    
+    return app.response_class(generate(), mimetype='text/plain')
 
 if __name__ == '__main__':
+   
     app.run(host='0.0.0.0', port=5050, debug=True)

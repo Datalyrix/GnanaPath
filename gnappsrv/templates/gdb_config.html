@@ -1,0 +1,111 @@
+{% extends "base_layout.html" %}
+{% block content %}
+
+<div class="content-section">
+  <form class="md-form" method="post" action="" enctype="multipart/form-data">
+    
+   <div class="input-group">
+       <label class="custom-label" ><h4>GNGraph Configuration</h4> </label>
+   </div>
+
+
+</div>
+ <hr/>
+    <div class="p-2">
+      <h5> Static Files Mode </h5>
+      <div class="row">
+	 <div class="col-md-12">
+	       <label> Static file mode </label>
+	       {% if cfg['sfmode']  %}
+                   <input type="checkbox" name="sfmode" id="sfmode" checked></input>
+		{% else  %}
+                   <input type="checkbox" name="sfmode" id="sfmode"  ></input>
+		   
+		{% endif %}
+		<div class="row">   
+                  <label> Static Files mode is enabled by default </label>
+		</div>  
+         </div>
+
+      </div>
+      
+    </div>
+    <hr>
+    <div class="p-2">
+      <h5> Database Mode </h5>
+
+      <div class="row">
+	<div class="col-md-12">
+	  
+	  <label> Check to turn on Postgres Database mode </label>
+	  {% if cfg['dbmode']  %}
+   	     <input type="checkbox" name="dbmode" id="dbmode" checked></input>
+          {% else %}
+	     <input type="checkbox" name="dbmode" id="dbmode"></input>
+	  {% endif %}  
+	    
+	</div>	
+      </div>
+
+      <hr>
+      
+      <label> Current Postgres DB Settings </label>
+      <table class="table">
+	<thead>
+	  <tr>
+	    <th scope="col">#</th>
+	    <th scope="col">Value</th>
+	  </tr>
+	</thead>
+	<tbody>
+	  <tr>
+	    <th scope="row"> DB Server Name</th>
+	    <td>{{ pgres_conf["serverIP"] }} </td>
+	  </tr>
+	  <tr>
+	    <th scope="row">DB Port</th>
+	    <td>{{ pgres_conf['serverPort'] }}</td>
+	  </tr>
+	  <tr>
+	    <th scope="row">DB User</th>
+	    <td>{{ pgres_conf['username'] }}</td>
+	  </tr>
+          <tr>
+	    <th scope="row">DB Name</th>
+	    <td>{{ pgres_conf["dbname"] }} </td>
+	  </tr>
+	</tbody>
+	</table>
+
+        <div class="row">
+          <div class="col-md-12">
+             <a class="btn btn-primary" href="/pgresdb_conf" role="button">DB Setup</a>
+          </div>
+        </div>
+
+      
+    </div>
+    
+
+
+    
+  <br>
+   <hr>
+    <div class="input-group-prepend">
+        <button type="submit" class="btn btn-primary">Save Settings</button>
+    </div>
+
+    
+ </form>
+</div>
+
+
+ 
+<script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+<script type="application/javascript">
+ $('input[type="file"]').change(function(e){
+        var fileName = e.target.files[0].name;
+        $('.custom-file-label').html(fileName);
+    });
+</script>
+{% endblock content %}

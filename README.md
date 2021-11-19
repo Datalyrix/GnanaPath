@@ -1,6 +1,6 @@
 
 <h3> Graph-based framework for connected-data analytics</h3>
-- updated time Feb7 2021
+- updated time Nov 1 2021
 
 The framework allows you to store data into node and edges and creates edges as based on logic you can provide.
 The framework has  visualization of metadata nodes and datanodes.
@@ -10,8 +10,9 @@ It is built using following
 - pyspark
 - cytoscape-js
 - jupyter notebook
-- backend graph engine is using neo4j 
+- backend storage with posgres and staticfiles (stored) in container
 - python flask
+
 
 The framework can be execute as part of docker containers
 
@@ -22,10 +23,19 @@ The framework can be execute as part of docker containers
 
 <h4> Setup using Dockerfile </h4>
 
-After checking out repo. Go to the local repo directory
-cd GnanaPath
+ After checking out repo. Go to the local repo directory
 
-\# run docker build
+cd GnanaPath
+Choose the appropriate Dockerfiler (pyspark or Jupyter Notebook)
+for pyspark-based container:
+
+\$ ln -s Dockerfile.pyspark Dockerfile
+
+\# run docker build and run container
+# sh ./gn_docker_create_run.sh
+
+or run step-by-step commands
+
 \# docker build -t gnpath .
 
 After the docker image is created run the image
@@ -36,76 +46,49 @@ After that open browser http://<dockerhostip>:5050
 
 Login/passwd: gnadmin/gnana
 
- You can continue from "Connecting to backend Neo4j Server" section below
+## To clean up container
+sh ./gn_docker_cleanup.sh
+
+
+
+##  GNGraph Storage
+Currently gnpath supports storage  as static files and/or backend database using postgres
+
+By default, the static files storage is always turned on.
+
+To enable database mode, you will need to setup postgres database.
+
+Under Graph Config section, you can enable static file mode and db mode and also setup database configuration.
+
+
+
+
+
+#### Setting up Postgres container
+You can run postgres as container and connect with GNPath
+
+#docker pull postgres:alpine
+
+# Run postgres container
+
+#docker run --name gnpgresdb -p 5432:5432 -e POSTGRES_USER=<PostgreUser> -e POSTGRES_PASSWORD=<PASSWORD> -d postgres:alpine
 
  
+#### Setup GNGraph DB on Postgres DB
+
+Now login into GNPath UI
+
+Go to "Graph Config" section. Click DB Setup
+
+You will go to GNGraph Postges DB Settings
+
+Enter Server IP (If you are using docker container, make sure you add host.docker.internal as Server IP or IP address of the host. if docker network is configured, you can add container name as hostname)
+
+and other credentials (port, username, and password)
+
+Under Database Name: You can create new Database for GNgraph or use existing database where the GNgraph schemas and tables are created.
 
 
-
-<h4> Setup GnanaPath Manually</h4>
-We built using jupyter/pyspark notebook.  
-
-- Download and install jupyter/pyspark notebook or get docker container from https://hub.docker.com/r/jupyter/pyspark-notebook/
-
-- If you choose docker container for notebook, then make sure you port map for 5050 for Gnana UI
- Example:
-  \# docker run -d -p 8888:8888  <b>-p 5050:5050</b>  --name jupyntbook  jupyter/pyspark-notebook
-
-- Open terminal on the notebook and git clone GnanaPath repo
-
- \# git clone https://github.com/Datalyrix/GnanaPath.git
-
--  Install python related modules for this project
-
-\# pip install -r gnpappsrv/requirements.txt
-
-
-<h4> Neo4j Setup and Server Credentials </h4>
-We are neo4j as backend graph engine to store nodes and edges. We use python-bolt driver to update neo4j engine.
-If you already have neo4j installed and up and running, then you can skip this step.
-
-We have used community edition of neo4j container to setup. For other options please visit http://neo4j.com
-
-Please refer link to install neo4j as container https://github.com/neo4j/docker-neo4j
-
-get Bolt port (ex: 7687) and user credentials (user/passw) for GnanaUI to connect
-
-
-<h4> Starting GnanaApp Server </h4>
-Now you are ready to run GnanaApp Server. Goto gnana clone repo directory
-
-cd gnpappsrv
-
-python gnpappsrv
-
-You should see log like:
-* Serving Flask app "gnp_appsrv_main" (lazy loading)
- * Environment: production
-   WARNING: This is a development server. Do not use it in a production deployment.
-   Use a production WSGI server instead.
- * Debug mode: on
- * Running on http://0.0.0.0:5050/ (Press CTRL+C to quit)
- * Restarting with stat
- * Debugger is active!
- * Debugger PIN: XXX-XXX-XXX
- 
- Now open browser go to  http://<jupyternotebook-ip>:5050
- You can GnanaPath UI and click login
- Default user/passwd  (gnadmin/gnana)
- 
- 
- <h4> Connecting to backend Neo4j Server </h4>
-You will have connect to backend neo4j server to store data.
-
-After you login into GnanaPath UI, 
- 
-- click connect
-
-- Enter Neo4j Server IP and Bolt Protocol port(ex: 7687)
-   Ex:  XXX.XXX.XXX.XXX:7687
-   
-- Enter username and password
-Click connect, if you connection is successful you will see success status message
 
 
 ***Now you are ready to upload the data*****
@@ -129,9 +112,8 @@ Click connect, if you connection is successful you will see success status messa
  
  <h2> ToDo list </h2>
 
-We have lot of todo list for this project and will be updating in this section.
-
-- pyspark-based graph engine
+- Scaling with Data
+- Addign Business Data connectors
 
 
 
