@@ -32,8 +32,7 @@ class       GNGraphPgresDBOps:
         try:
             #Create an engine instance
             pgres_connstr='postgresql+psycopg2://'+dbuser+':'+dbpasswd+'@'+dbserver+':'+dbport+'/'+dbname
-            print('PgresDBOps: Init ')
-            print(pgres_connstr)
+            gn_log('PgresDBOps: setting up connection ')
             alchemyEngine   = create_engine(pgres_connstr, pool_recycle=3600)
             # Connect to PostgreSQL server
             self.dbEngine = alchemyEngine
@@ -49,19 +48,17 @@ class       GNGraphPgresDBOps:
             self.gnmeta_schema = "gnmeta"
             self.gnedge_table = "gnedges"
             self.dbtype = dbtype
-            print('pgresDBOps: Connected  ')
-            print(self.dbConnp)
         except exc.SQLAlchemyError as err:
             self.dbConnp = None
             self.connected = 0
-            print('gngraphPgresDBOps: unable to connect pgres ')
-            print(err)
+            gn_log('gnPgresDBOps: unable to connect pgres DB Error ')
+            gn_log(err)
             
         except exc.OperationalError as err:
             self.dbConnp = None
             self.connected = 0
-            print('gngraphPgresDBOps: unable to connect pgres ')
-            print(err)
+            gn_log('gnPgresDBOps: unable to connect pgres Operational Error ')
+            gn_log(err)
                                                             
       
         
@@ -128,7 +125,7 @@ class       GNGraphPgresDBOps:
 
         if (self.dbtype != "gndatadb"):
             return -1
-        print("gnPgresDBops: Writing data node for "+tgt_schema+"."+tgt_table+"  ")
+        gn_log("gnPgresDBops: Writing data node for "+tgt_schema+"."+tgt_table+"  ")
         if (self.connected):
             dataDF.to_sql(tgt_table, self.dbConnp, schema=tgt_schema,  if_exists='append', index=False)
             return 0
@@ -169,7 +166,7 @@ class       GNGraphPgresDBOps:
         tabl_name = bizdomain+"."+nodename
         datatbl_col= "gnnodeid bigint NOT NULL PRIMARY KEY, gnnodetype text, gnmetanodeid bigint, gndatanodeprop json, gndatanodeobj json, uptmstmp Timestamp"  
         create_tbl_str = "CREATE TABLE IF NOT EXISTS "+tabl_name+" ("+datatbl_col+")"
-        print('PgreDBOps: tablstr: '+create_tbl_str)
+        gn_log('gnPgreDBOps: tablstr: '+create_tbl_str)
         self.dbEngine.execute(create_tbl_str) 
         return
 
