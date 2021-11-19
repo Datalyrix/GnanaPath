@@ -39,7 +39,7 @@
                 <a class="nav-item nav-link" href="{{ url_for('upload_file') }}">Upload</a>
                 <a class="nav-item nav-link" href="{{ url_for('gnview_cola_api') }}">Searchview</a>
                 <a class="nav-item nav-link" href="{{ url_for('gnmetaview_cola_api') }}">Metaview</a>
-	 	            <a class="nav-item nav-link" target="_blank" href="{{ url_for('gn_log_stream') }}">Logs </a>
+                <a class="nav-item nav-link" target="_blank" href="{{ url_for('gn_log_stream') }}">Logs </a>
                 <a class="nav-item nav-link" href="{{ url_for('logout') }}">Logout</a>
               {% else %}
                 <a class="nav-item nav-link" href="{{ url_for('user_login') }}">Login</a>
@@ -66,8 +66,27 @@
          {% block content %}
 
   <div class="container">
-        <h2>Welcome Gnanapath</h2>
-<p> Gnanapath provide business data platform </p>
+        <h2>Welcome to Gnanapath</h2>
+        <h3> Business data platform </h3>
+	<hr>
+	<h5> To get started </h5>
+	<p> Go to Upload Section, and upload file </p>
+	<p> go to Metaview and verify that metadata is uploaded </p>
+	<p> go to SearchView and verify data  and its connections </p>
+	<hr>
+	<h5> Graph Config </h5>
+	<p>  Gngraph can store the uploaded files as static files and store them into a backend database(postgres) </p>
+	<p> static mode: Storing graph data as static files </p>
+	<p> database mode: Storing graph data into backend database</p>
+
+	<p> To set these mode  Goto Graph Config Section and click the mode. Please note: static mode is turned on by default </p>
+	  
+	<h5> Database mode </h5>
+         <p> In the database mode, the graph database will be created and uploaded data will be stored as graph data into the backend database. Currently Postgres is supported as backend database. </p> 
+	 
+	<p> To setup Postgres database, Go to Graph Config and then click DB Setup and provide databse connecton credentials, and test connection </p>
+	<p> also make sure you check dbmode in Graph Config section </p>
+	
    </div>
 
        {% endblock %}
