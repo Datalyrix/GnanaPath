@@ -24,11 +24,13 @@ from gnutils.get_config_file import get_config_neo4j_conninfo_file
 from gndwdb.gndwdb_neo4j_fetchops import gndwdb_metarepo_nodes_fetch_api, gndwdb_metarepo_edges_fetch_api
 from gnsearch.gnsrch_sql_srchops import gnsrch_sqlqry_api
 from gndwdb.gndwdb_neo4j_conn import gndwdb_neo4j_conn_check_api, gndwdb_neo4j_parse_config
+
 ###from gngraph.ingest.gngraph_ingest_main import gngraph_init
 from gndatadis.gndd_filedb_ops import gndd_filedb_insert_file_api, gndd_filedb_filelist_get
 from gndatadis.gndd_filelist_table import GNFileLogResults
 from gngraph.search.gngraph_search_main import gngrph_search_init, gngrph_srch_metarepo_nodes_edges_fetch, gngrph_srch_datarepo_qry_fetch
 from gngraph.gngraph_dbops.gngraph_pgresdbops import GNGraphPgresDBOps, GNGraphPgresDBMgmtOps
+
 import flask
 from flask import request, jsonify, request, redirect, render_template, flash, url_for, session, Markup, abort
 from werkzeug.utils import secure_filename
@@ -40,13 +42,13 @@ import json
 import re
 from connect_form import ConnectServerForm, LoginForm
 from collections import OrderedDict
+
 from gn_config import gn_config_init, gn_logging_init, gn_log, gn_log_err
 from gn_config import GNGraphConfigModel, GNGraphDBConfigModel
 from pathlib import Path
 import json
 import pathlib
 from pyspark.sql import SparkSession
-
 
 # Append system path
 
@@ -81,6 +83,7 @@ gn_config_init(app)
 ###UPLOAD_FOLDER = os.path.join(path, 'uploads')
 UPLOAD_FOLDER = app.config["gnUploadsFolder"]
 
+
 # Make directory if uploads is not exists
 if not os.path.isdir(UPLOAD_FOLDER):
     os.mkdir(UPLOAD_FOLDER)
@@ -89,6 +92,7 @@ if not os.path.isdir(UPLOAD_FOLDER):
 ###app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 #### Initialize Spark Session
+
 ##gnGraphCls = gngraph_init(app.config["gnRootDir"])
 
 app_name="gngraph_spk"
@@ -330,6 +334,7 @@ def pgresdb_config():
                 'pgres_db_setup.html', title='Graph DB Settings', form=form, disp_srch=False)
         else:
             session['serverIP'] = form.serverIP.data
+
             session['serverPort'] = form.serverPort.data
             flash(f'GNGraph database settings has been saved', 'success')
             return redirect(url_for('gdb_config_settings_page', disp_srch=True))
@@ -337,10 +342,9 @@ def pgresdb_config():
          print('Pgres Conf: Error in form submit')
          flash(f'Error on submit ', form.errors)         
          return render_template('pgres_db_setup.html', title='Connect Graph Server', form=form,  disp_srch=False)
-  
         
     ##return render_template(
-      ##  'connect_db.html', title='Connect Graph Server', form=form, disp_srch=False)
+      ##  'connect_db.html', title='Connect Graph Server', form=form, disp_srch=False)         
 
 
 @app.route("/modify/<serverIP>", methods=['GET', 'POST'])
@@ -532,9 +536,6 @@ def gnsrch_api():
         gn_log('GNPAppServer: Fetch Data Nodes with filter '+srchqry_filtered+' SUCCESS')
         gn_log('GNPAppServer: Fetch Data Nodes with filter '+srchqry_filtered+' SUCCESS')
         ##print(res)
-
-
-        
         ##res = {}
         ##res_data = re.sub(r"(\w+):", r'"\1":', res)
 
@@ -620,7 +621,6 @@ def gnmetaedges_fetch_api():
 
     ##res = gndwdb_metarepo_edges_fetch_api(srchqry, verbose)
     srchfilter=""
-
     res = gngrph_srch_metarepo_nodes_edges_fetch(gnsrch_ops, gnp_spark, srchfilter)
     
     ##res_data = re.sub(r"(\w+):", r'"\1":', res)
@@ -634,7 +634,6 @@ def gnmetaedges_fetch_api():
     # return json.JSONDecoder(object_pairs_hook=OrderedDict).decode()
     return rjson
 
-
 @app.route('/gnlog')
 def gn_log_stream():
     def generate():
@@ -646,8 +645,6 @@ def gn_log_stream():
         return content    
     return app.response_class(generate(), mimetype='text/plain')
 
-
-
 if __name__ == '__main__':
-    
+   
     app.run(host='0.0.0.0', port=5050, debug=True)

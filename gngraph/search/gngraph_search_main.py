@@ -46,7 +46,9 @@ class     GNGraphSearchOps:
             'gngraph_edge_filename': '',
      }
     
+
     def __init__(self,  gngrp_datadir, accessmode, fargs, dbargs, sp):
+
         ###Set up config init routine
         self.__gncfg = {}
         self.__gncfg_fargs = {}
@@ -261,16 +263,14 @@ class     GNGraphSearchOps:
                self.__entlist.append(ent)
             else:
                gn_log("GNGrphSrchOps: NodeDF setup "+node_name+" nodeDF is empty ")
-
-               
+                
         return
 
     def    gngraph_meta_nodes_edges_setup(self):
 
         self.get_metanodes_mapped_df()
         self.get_metaedges_mapped_df()
-        
-        
+
     
     def     gngraph_execute_sqlqry(self, sqlst):        
         resDF = self.__spark.sql(sqlst)
@@ -482,6 +482,7 @@ def     gngrph_srch_get_entlist_obsolete(sqlst):
         return nodes_list
 
 
+
 def        gngrph_search_init(gnp_spark, gndata_folder, gngraph_creds_folder, accessmode):
             
         gdb_creds_filepath=gngraph_creds_folder+"/gngraph_pgres_dbcreds.json"
@@ -499,15 +500,13 @@ def        gngrph_search_init(gnp_spark, gndata_folder, gngraph_creds_folder, ac
         fargs = {}
         fargs["gngraphfolder"] = gndata_folder+"/gngraph"
         fargs["gnmetanodesfname"] = "gnmeanodes.json"
-        fargs["gnmetaedgesfname"] = "gnmetaedges.json"
-                                    
+        fargs["gnmetaedgesfname"] = "gnmetaedges.json"                           
         ###entlist = gngrph_srch_get_entlist(sqlst)                                         
         gnsrch_ops = GNGraphSearchOps(gndata_folder, accessmode, fargs, gdbargs, gnp_spark)
         if (gnsrch_ops.srch_init_data_status() == 1):
             gn_log_err('GNGrphSrchOps: SearchOps Init failed ')
             gnsrch_ops = ''
             return gnsrch_ops
-
         
         gn_log('GNGrphSrchOps: GNGraph SearchOps init COMPLETE ')
         return gnsrch_ops
@@ -565,16 +564,18 @@ def          gngrph_srch_metarepo_qry_api(gnsrch_ops, gnp_spark, sqlst, nodesonl
             return (njson, edgesjson)
             
         (resNodeDF, nodesjson) = gnsrch_ops.gngraph_execute_sqlqry(sqlst)
+
         gn_log('GNGrphSrchOps: datanodes fetched ')
         gn_log('GNGrphSrchOps: sql st:'+sqlst)
         ##print(nodesjson)
-        gn_log('GNGrphSrchOps: Search meta nodes complete. get edges ')
+        gn_log('GNGrphSrchOps: Search meta nodes complete. get edges ')       
         ####resNodeDF.show(10)
         edgesjson = ""
         (edgesjson, derived_nodesjson) = gnsrch_ops.gngraph_metarepo_qry_getedges(resNodeDF, sqlst)
         njson = nodesjson+derived_nodesjson
         
         return (njson, edgesjson)
+
 
 
 
@@ -599,6 +600,7 @@ def         gngrph_srch_datarepo_qry_fetch(gnsrch_ops, gnp_spark, srchfilter):
     rJ = {}
     rJ["nodes"] = res
 
+
     edgResDF = gnp_spark.createDataFrame(edgesjson)
     eResDF = edgResDF.select(col("gnedgeid").alias("id"), \
                               col("gnedgetype").alias("type"), \
@@ -616,6 +618,7 @@ def         gngrph_srch_datarepo_qry_fetch(gnsrch_ops, gnp_spark, srchfilter):
 
     
     
+
 
 def        gngrph_srch_metarepo_nodes_edges_fetch(gnsrch_ops, gnp_spark, srchfilter):
 
@@ -642,7 +645,9 @@ def        gngrph_srch_metarepo_nodes_edges_fetch(gnsrch_ops, gnp_spark, srchfil
     rJ = {}
     rJ["nodes"] = res
 
+
     edgResDF = gnp_spark.createDataFrame(edgesjson)
+
     eResDF = edgResDF.select(col("gnedgeid").alias("id"), \
                               col("gnedgetype").alias("type"), \
                               col("gnsrcnodeid").alias("source"), \
@@ -650,8 +655,7 @@ def        gngrph_srch_metarepo_nodes_edges_fetch(gnsrch_ops, gnp_spark, srchfil
     ###eResDF.show(10)
     eres = eResDF.toJSON().map(lambda j: json.loads(j)).collect()
     ###eres = eResDF.toJSON().first()
-    rJ["edges"] = eres    
-        
+    rJ["edges"] = eres                
     return(rJ)
 
     
@@ -674,12 +678,14 @@ if __name__ == "__main__":
     sqlst = "SELECT * from customer"                
     
     ### Set spark session
+
     gnp_spark = SparkSession.builder.appName(app_name).getOrCreate()
     nodesonly = 0
     accessmode={'sfmode': 1, 'dbmode':1 }
     gngrph_cls = gngrph_search_init(gnp_spark, gndata_folder, gngraph_creds_foler, accessmode)
     
     (nJSON, eJSON) = gngrp_srch_qry_api(gngrph_cls, sqlst,  nodesonly)
+
     rfile="nodes.json" 
     with open(rfile, 'w') as fp:
             json.dump(nJSON, fp)

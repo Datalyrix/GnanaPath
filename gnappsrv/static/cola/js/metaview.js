@@ -212,8 +212,7 @@
                 console.log('GNView: Fetch complete ');
 	        /////console.log('GNView: data  nodes :'+JSON.stringify(data.gndata.nodes, null,3));
 		var status = data.status;
-	
-		
+         
 		if (status == "ERROR") {
                     console.log('GNView: Error status ');
                     errlbl.innerHTML = "Error getting data from database";
@@ -296,7 +295,7 @@
 			edges += '"directed": true';
 			edges += '}'+"\n";		   
 		    }
-		    
+       
 		    ///edges += ']'+"\n";
 		    s = '['+"\n";
 		    ///////s += '{'+"\n";
@@ -314,10 +313,10 @@
 		    gn_elements = {};
 		    stlbl.innerHTML = "Empty Metadata";
 		}
+
 		    
 		//gn_elements  = s;
 		console.log('GnanaMetaView: fetch process is completed');
-	
 		return (gn_elements);
 		////////////////////////////////
 		
@@ -326,6 +325,7 @@
 	    console.log('Error caught '+error);
 	}
 	stlbl.innerHTML = "Data Upload Complete";
+
     }
 
     function setNodesMethod() {  

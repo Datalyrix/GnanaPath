@@ -158,6 +158,7 @@ def        gn_config_init(app):
     if not os.path.isdir(app.config["gnUploadsFolder"]):
         os.mkdir(app.config["gnUploadsFolder"])
         print(app.config["gnUploadsFolder"]+" is created")
+
     if not os.path.isdir(app.config["gnCfgDBFolder"]):
         os.mkdir(app.config["gnCfgDBFolder"])
         print(app.config["gnCfgDBFolder"]+" is created")    
@@ -168,9 +169,10 @@ def        gn_config_init(app):
         os.mkdir(app.config["gnProfileFolder"])
         print(app.config["gnProfileFolder"]+" is created")
     if not os.path.isdir(app.config["gnGraphFolder"]):
+
         os.mkdir(app.config["gnGraphFolder"])
         print(app.config["gnGraphFolder"]+" is created")
-   
+
     app.config["gnLogDir"] = app.config["gnRootDir"]+"/gnlog"
     app.config["gnLogFile"] = "gnpath.log"
     app.config["gnLogFilePath"] = app.config["gnLogDir"]+"/"+app.config["gnLogFile"]

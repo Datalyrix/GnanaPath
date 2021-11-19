@@ -235,7 +235,6 @@
 		var nodelen = gndata.nodes.length;
 		var edgeslen = gndata.edges.length;
 
-
 		if (status == "ERROR") {
                     console.log('GNView: Error status ');
                     errlbl.innerHTML = "Error getting data from database";

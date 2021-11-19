@@ -79,7 +79,7 @@ class       GNGraphPgresDBOps:
             return 0
         else:
             return 1
-        
+
     def    metadb_nodes_getall(self, isResultDataFrame):
         psql_query = '''
              SELECT  * FROM gnmeta.gnnodes
@@ -224,9 +224,7 @@ class       GNGraphPgresDBOps:
         if (self.connected):
             metaBizRuleDF.to_sql(self.gnbizrules_table, self.dbConnp, schema=self.gnmeta_schema,  if_exists='append', index=False)
             return 0
-
-
-        
+    
 """
       New Gngraph DB Initialize method create new gngraph database  and setup schemas, tables. The following schemas and tables are created- 
 """
@@ -417,5 +415,3 @@ class       GNGraphPgresDBMgmtOps:
         gn_log('GNGraphDBInit: schemas CUSTOMER_DOMAIN, PRODUCT_DOMAIN, SALES_DOMAIN are created ')
         gn_log('GNGraphDBInit: GNGraph Intialization Successful ')
         return 0
-
-
