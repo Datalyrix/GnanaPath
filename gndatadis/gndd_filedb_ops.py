@@ -13,7 +13,7 @@ class FileLogSchemaModel:
         self._db = TinyDB(dbpath)
 
     def req_fields_json(self, dict_result):
-        req_items = ['flid', 'filename', 'filesize', 'filetype', 'uploadtm', 'ingesttm', 'filedesc', 'filedelim', 'fileencode', 'tags', 'state']
+        req_items = ['flid', 'filename', 'filesize', 'filetype', 'bizdomain', 'uploadtm', 'ingesttm', 'filedesc', 'filedelim', 'fileencode', 'tags', 'state']
         return {key: value for key, value in dict_result.items()
                 if key in req_items}
 
@@ -80,7 +80,7 @@ class FileLogSchemaModel:
 
 
 
-def   gndd_filedb_insert_file_api(fname, fsize, ftype, fdesc, fdelim, flogdbpath):
+def   gndd_filedb_insert_file_api(fname, fsize, ftype, bizdomain, fdesc, fdelim, flogdbpath):
 
      # datetime object containing current date and time
      now = datetime.now()
@@ -94,6 +94,7 @@ def   gndd_filedb_insert_file_api(fname, fsize, ftype, fdesc, fdelim, flogdbpath
      req_d["filename"] = fname
      req_d["filesize"] = fsize
      req_d["filetype"] = ftype
+     req_d["bizdomain"] = bizdomain
      req_d["uploadtm"] = dt_string
      req_d["filedesc"] = fdesc
      req_d["filedelim"] = fdelim

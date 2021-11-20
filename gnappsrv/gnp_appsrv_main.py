@@ -129,6 +129,38 @@ def allowed_file(filename):
         '.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
+###### Supported functions need to move
+def    gn_pgresdb_testconnection(dbcredpath, dbname):
+
+    pgres_c = GNGraphDBConfigModel(dbcredpath)
+    pgres_conf = pgres_c.get_op()
+    
+    if ((pgres_conf['serverIP'] == '') or (pgres_conf['serverPort'] == '') or (pgres_conf['username'] == '') or (pgres_conf['password'] == '')):
+        connection_status = "NotConfigured"
+        return connection_status
+
+    pgdb_cls = GNGraphPgresDBOps(pgres_conf['serverIP'], pgres_conf['serverPort'], pgres_conf['username'], pgres_conf['password'], dbname, "")
+    is_connect = pgdb_cls._isconnected()
+
+    if (is_connect == 1):
+        connection_status = "Connected"
+    else:
+        connection_status = "NotConnected"
+
+    return connection_status
+
+def       gn_pgresdb_getconfiguration(dbcredpath):
+
+    pgres_c = GNGraphDBConfigModel(dbcredpath)
+    pgres_conf = pgres_c.get_op()
+    pgres_connection_status = gn_pgresdb_testconnection(dbcredpath, "postgres")
+
+    pgres_conf["connectionStatus"] = pgres_connection_status
+    return pgres_conf
+
+
+
+
 @login_manager.user_loader
 def load_user(user_id):
     return all_users.get(user_id)
@@ -152,8 +184,6 @@ def upload_file():
         fres = gndd_filedb_filelist_get(app.config["gnCfgDBFolder"]);
         flen = len(fres)
         ###fres_table = GNFileLogResults(items=fres)
-        print('upload ')
-        print(fres)
         return render_template('upload.html', disp_srch=_srch, file_res=fres, flen=flen)
     if request.method == 'POST':
 
@@ -162,16 +192,21 @@ def upload_file():
             return redirect(request.url)
 
         files = request.files["fd"]
-        print(files)
-
         fdesc = request.form["fdesc"];
-        print(' upload fdesc '+fdesc);
-
         ftype = request.form["ftype"];
-        print(' upload ftype '+ftype);
-
         fdelim = request.form['fdelim'];
-        print(' upload fdelim '+fdelim);
+
+        if 'ingest_mode' in request.form:
+            fingest = request.form['ingest_mode'];
+        else:
+            fingest = 'off'
+        if 'dataset_name' in request.form:
+            datasetname = request.form['dataset_name']
+            print(' Dataset name '+datasetname)
+        else:
+            datasetname = ''
+
+        bizdomain = request.form['bizdomain']
         
         if not allowed_file(files.filename):
             flash('Please upload CSV or JSON file', 'danger')
@@ -180,20 +215,27 @@ def upload_file():
             fname = secure_filename(files.filename)
             file_name,file_ext=fname.split(".")
             filename= re.sub(r'\W+','',file_name)+f'.{file_ext}'
-            print(filename)
-            print(app.config['gnUploadsFolder'])
             files.save(os.path.join(app.config['gnUploadsFolder'], filename))
+            gn_log('GNAppServer: uploaded file '+filename+ ' successfully ')
+            
             ### For timebeing disable csv file upload
             ###gndwdbDataUpload(app.config['gnUploadsFolder'], filename)
             ###fdelim = ','
             fp = Path(app.config['gnUploadsFolder']+"/"+filename)
             fsize = fp.stat().st_size
-            gndd_filedb_insert_file_api(filename, fsize, ftype, fdesc, fdelim, app.config["gnCfgDBFolder"])
+            gndd_filedb_insert_file_api(filename, fsize, ftype, bizdomain, fdesc, fdelim, app.config["gnCfgDBFolder"])
             fres = gndd_filedb_filelist_get(app.config["gnCfgDBFolder"]);
             flen = len(fres)
             #print(fres_table)
             ##fres_table = GNFileLogResults(items=fres)
-            
+            if (fingest == 'on'):
+                if (datasetname is None):
+                    nodename, fext = filename.split(".")
+                else:
+                    nodename = datasetname
+                print(' Ingest file '+nodename+ ' Biz Domain '+bizdomain)    
+                ##gngraph_ingest_file_api(filename, ftype, fdelim, nodename, bizdomain, gndata_folder, gngraph_creds_folder)
+                
         flash(f'File {filename} successfully uploaded', 'success')
         ####return redirect(url_for('gn_home', disp_srch=_srch))
         return render_template('upload.html', disp_srch=_srch, file_res=fres, flen=flen)
@@ -225,12 +267,12 @@ def  gdb_config_settings_page():
        gdbcfg_settings = {} 
        gdbcfg_settings['sfmode'] = 1
        gdbcfg_settings['dbmode'] = 0
-    print(gdbcfg_settings)
-    pgres_c = GNGraphDBConfigModel(app.config["gnGraphDBCredsFolder"])
-    pgres_conf = pgres_c.get_op()
-    print(pgres_conf)
-    #if (request.method == 'GET'):
-        
+    gn_log('Current GnDBmode settings ')
+    gn_log(gdbcfg_settings)
+
+    pgres_conf = gn_pgresdb_getconfiguration(app.config["gnGraphDBCredsFolder"])
+    gn_log(' GnDB Config settings ')
+    gn_log(pgres_conf)
     if (request.method == 'POST'):
         print('GB Config POST')
         in_vars = request.form.to_dict()
@@ -415,23 +457,7 @@ def user_login():
         return render_template("login.html", form=form)
 
     login_user(user)
-    if neo4j_conn_check_api() == "NoFile":
-        _srch = False
-        flash("Please input the server config details", 'success')
-        return redirect(url_for('connect_server', disp_srch=_srch))
-
-    if neo4j_conn_check_api() == "Error":
-        _srch = False
-        connect = ConnectModel(path)
-        connect._db.truncate()
-        flash("Error connecting to db server", 'danger')
-        return redirect(url_for('connect_server', disp_srch=_srch))
-    _srch = True
-    cfg_file = get_config_neo4j_conninfo_file()
-    conn_param = gndwdb_neo4j_parse_config(1)
-    session['serverIP'] = conn_param['serverIP']
-    return redirect(url_for('connect_server', disp_srch=_srch))
-
+    return redirect(url_for('gn_home'))
 
 @app.route('/gnsrchview', methods=['GET'])
 @login_required
@@ -490,7 +516,7 @@ def  testdb_conn():
         if (dbname):
            pgdb_cls = GNGraphPgresDBOps(dbIP, dbPort, dbUser, dbPasswd,  dbname, "") 
         else:
-           print('DBTestConn: dbname not provided for testing ')
+           gn_log('TestConn: dbname not provided for testing ')
            rjson = {
               "status": "FAIL",
                "connect_status": 0,

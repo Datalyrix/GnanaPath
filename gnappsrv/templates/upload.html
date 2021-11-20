@@ -40,8 +40,18 @@
         <option value="|">"|" (Pipe-seperated)</option>
       </select>
     </div>
-
-
+    <div class="p-2">
+      <input type="checkbox" name="ingest_mode" id="ingest_mode"> </input>
+      <label> Check to ingest data into Graph Database </label>
+      <label> During upload, the file is cached however if you want to automatically ingest data as well, please check this option </label>      
+   </div>
+    <div class="p-2">
+      <select id="bizdomain" name="bizdomain">
+	<option value="sales"> Sales Domain </option>
+	<option value="product"> Product Domain </option>
+	<option value="customer"> Customer Domain </option>
+	<option value="other"> Other </option>
+     </select>
     
   <br>
    <hr>
@@ -57,41 +67,42 @@
     <h6> Uploaded Files </h6>
 
    
-    <table style="margin-left: 20px;font-size: 14px;border:1px">
-      <th>
+    <table class="table">
+      <thead>
         <tr>
-	  <td> fileid </td>
-	  <td> filename </td>
-	  <td> filetype </td>
-	  <td> filedesc </td>
-	  <td> filesize </td>
-	  <td> Action </td>
+	  <th scope="col"> fileid </th>
+	  <th scope="col"> filename </th>
+	  <th scope="col"> filetype </th>
+	  <th scope="col"> filedesc </th>
+	  <th scope="col"> filesize </th>
+	  <th scope="col"> Action </th>
 	</tr>
-      </th>	
-      
+      </thead>	
+      <tbody>
         {% for i in range(0, flen) %}
         <tr>
-          <td>
+          <th>
 	    {{ file_res[i].flid }}
-          </td>
-	  <td>
+          </th>
+	  <th>
 	    {{ file_res[i].filename }}
-	  </td>
-	  <td>
+	  </th>
+	  <th>
 	    {{ file_res[i].fieltype }}
-	  </td>
-	  <td>
+	  </th>
+	  <th>
 	    {{ file_res[i].filedesc }}
-	  </td>
-	  <td>
+	  </th>
+	  <th>
 	    {{ file_res[i].filesize }}
-	  </td>
-	  <td>
+	  </th>
+	  <th>
  	    {{ file_res[i].state }}
-	  </td>
+	  </th>
 	</tr>
 	
-	{% endfor %} 
+	{% endfor %}
+      </tbody>
     </table>
     
   </form>
