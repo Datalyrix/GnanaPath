@@ -13,6 +13,7 @@ RUN pip --no-cache-dir install pyspark==${PYSPARK_VERSION}
 
 LABEL maintainer="gnanapath project"
 EXPOSE 5050
+EXPOSE 4040
 USER root
 
 RUN apt-get update \
