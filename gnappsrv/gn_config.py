@@ -142,7 +142,7 @@ gn_config_init: Main init config routine
 """
 
 def        gn_config_init(app):
-    
+    print('GnConfig: Initializing Config directories ')
     app.config["gnDataFolder"] = app.config["gnRootDir"]+"/gndata"
     app.config["gnDBFolder"] = app.config["gnRootDir"]+"/gndb"
     app.config["gnCfgDBFolder"] = app.config["gnRootDir"]+"/gnconfigdb"
@@ -169,27 +169,38 @@ def        gn_config_init(app):
         os.mkdir(app.config["gnProfileFolder"])
         print(app.config["gnProfileFolder"]+" is created")
     if not os.path.isdir(app.config["gnGraphFolder"]):
-
         os.mkdir(app.config["gnGraphFolder"])
-        print(app.config["gnGraphFolder"]+" is created")
-
+        
+    # check if config and data directory are part of gngraph
+    cfg_dir = app.config["gnGraphFolder"]+"/config"
+    data_dir = app.config["gnGraphFolder"]+"/data"
+    if not os.path.isdir(cfg_dir):
+        os.mkdir(cfg_dir)
+    if not os.path.isdir(data_dir):
+        os.mkdir(data_dir)
+    gn_log(app.config["gnGraphFolder"]+" and subdirs are created")    
+        
+          
     app.config["gnLogDir"] = app.config["gnRootDir"]+"/gnlog"
     app.config["gnLogFile"] = "gnpath.log"
     app.config["gnLogFilePath"] = app.config["gnLogDir"]+"/"+app.config["gnLogFile"]
     
     ###Read Config settings
     gncfg = GNGraphConfigModel(app.config["gnGraphDBCredsFolder"])
+    gncfg_settings = gncfg.get_op()
     
-    app.config["gncfg_settings"] = gncfg.get_op()
-
+    #app.config["gnCfgSettings"] = gncfg.get_op()
     gndb_cfg = GNGraphDBConfigModel(app.config['gnGraphDBCredsFolder'])
-    app.config["gndbcfg_settings"] = gndb_cfg.get_op()
+    gndb_cfg_settings = gndb_cfg.get_op()
+    gncfg_settings["gnDBCfgSettings"] = gndb_cfg_settings    
+    app.config["gnCfgSettings"] = gncfg_settings
                                     
     
     
         
 def     gn_logging_init(logname):
-    
+
+    print("GnLog: Initializing Logging ")
     path = os.getcwd()
     gnRootDir = path.rsplit('/', 1)[0]
     gnLogDir = gnRootDir+"/gnlog"

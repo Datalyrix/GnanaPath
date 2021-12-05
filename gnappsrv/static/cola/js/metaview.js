@@ -222,24 +222,25 @@
 		}
 		
 		var statusmsg = data.statusmsg;		
-		var nodeslen = data.gndata.nodes.length;
-		var edgeslen = data.gndata.edges.length;
+		var nodeslen = data.gndata.nodelen;
+		var edgeslen = data.gndata.edgelen;
 		
 		if (nodeslen > 0 && edgeslen > 0) {
 		    nodes = '';	      
-		    ///s = '{'+"\n";
-		    //nodes += ' '+"\n";
-		    ////console.log('GNView: fetch complete len:'+nodelen);
-		    for (i=0; i < nodelen; i++) {
+		    console.log('GNView: fetch complete len:'+nodeslen);
+		    nodesJobj = data.gndata.nodes;
+		    
+		    for (i=0; i < nodeslen; i++) {
 			
 			if ( i > 0)
 			    nodes += ","+"\n";
 			
 			nodes += '{';
-			n = data.gndata.nodes[i];
+			n = JSON.parse(data.gndata.nodes[i]);
+			
 			nodes += '"data": {';
 			var idint = parseInt(n.id);
-			///console.log('GNView node-'+i+' id '+n.id);
+
 			nodes+= '"id": "n'+n.id+'", ';
 			nodes+= '"idInt": '+(idint)+',';
 			nodes+= '"name": "'+n.nodename+'", ';
@@ -256,25 +257,27 @@
 		    }
 		    
 		    ///nodes += ']'+"\n";
+		    console.log('GNView: processed the nodes  ')
+		    
 		    ////////// Get edges 
-		    //console.log('GNView: Fetch Edges complete ');
-		    //console.log('GNView: data:'+JSON.stringify(data, null,3));
-		    var edgeslen = data.gndata.edges.length;
+		    var edgeslen = data.gndata.edgelen;
 		    
 		    edges = '';
 		    
-		    ///s = '{'+"\n";
-		    ///edges += '['+"\n";
-		    //console.log('GNView: fetch Edges complete len:'+nodelen);
+
+		    console.log('GNView: Starting edges for process len:'+edgeslen);
+		    
 		    for (i=0; i < edgeslen; i++) {	  
 			if ( i > 0)
 			    edges += ",";
 			
 			edges += '{';
-			e = data.gndata.edges[i];
+			e = JSON.parse(data.gndata.edges[i]);
+
 			edges += '"data": {';
 			var idint = parseInt(e.id);
-			////console.log('GNView node-'+i+' id '+n.id);
+			
+			console.log('GNView edge-'+i+' id '+e.id);
 			edges += '"id": "e'+e.id+'", ';
 			edges += '"idInt": '+(idint)+',';
 			edges += '"relname": "'+(e.type)+'" ,';
@@ -295,7 +298,7 @@
 			edges += '"directed": true';
 			edges += '}'+"\n";		   
 		    }
-       
+                    console.log('GNView: prepared edges '+edges);
 		    ///edges += ']'+"\n";
 		    s = '['+"\n";
 		    ///////s += '{'+"\n";
@@ -306,7 +309,7 @@
 		    s += '\n';
 		    s += ']'+"\n";
 		    ////s += '}'+"\n";
-		    ///console.log('GNView nodes1 & edges:  '+s);
+		    console.log('GNView nodes & edges:  '+s);
 		    gn_elements = JSON.parse(s);
 		    stlbl.innerHTML = "Data Upload Complete";
 		} else {

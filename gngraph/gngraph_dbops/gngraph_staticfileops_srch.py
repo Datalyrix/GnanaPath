@@ -25,13 +25,19 @@ class  GNGraphSrchStaticFileOps:
             self.gnmeta_schema = "gnmeta"
             self.gnedge_table = "gnedges"
             self.__spark = sp
+            self.__gnmetaEdges_mapped = 0
+            self.__gnmetaNodes_mapped  = 0
+            
             self.gnmetanode_filepath = self.gndata_graph_data_folder+"/"+"gnmetanodes.json"
             self.gnmetaedge_filepath = self.gndata_graph_data_folder+"/"+"gnmetaedges.json"
             try:
-                self.__gnmetaNodeDF = self.__spark.read.json(self.gnmetanode_filepath)    
-                self.__gnmetaEdgeDF = self.__spark.read.json(self.gnmetaedge_filepath)
-                self.__gnmetaNodeDF.createOrReplaceTempView("gnmetanodes")
-                self.__gnmetaNodeDF.createOrReplaceTempView("gnmetaedges")
+                self.gnmetanodes_map_df(self.__spark)
+                self.gnmetaedges_map_df(self.__spark)
+            #try:
+            #    self.__gnmetaNodeDF = self.__spark.read.json(self.gnmetanode_filepath)    
+            #    self.__gnmetaEdgeDF = self.__spark.read.json(self.gnmetaedge_filepath)
+            #    self.__gnmetaNodeDF.createOrReplaceTempView("gnmetanodes")
+            #    self.__gnmetaNodeDF.createOrReplaceTempView("gnmetaedges")
                 self.__init_failed = 0
             except:
                 gn_log_err('GNStaticFileOps:  error reading file '+self.gnmetanode_filepath)
@@ -42,7 +48,7 @@ class  GNGraphSrchStaticFileOps:
        jobj = {}
        
        if spk is None:
-           gn_log_err('GNStaticFileOps: spark session is not found')
+           gn_log_err('GnStaticFOps: spark session is not found')
            return jobj
 
        if self.__init_failed == 1:
@@ -50,18 +56,29 @@ class  GNGraphSrchStaticFileOps:
            return jobj
        
        sqlstr = "SELECT * FROM gnmetanodes where gnnodename='"+node+"'"
-       print('get_metanode_info:  sqlstr '+sqlstr)
+       print('GnStaticFOps:  getting metanode info '+node+' sqlstr '+sqlstr)
        nodeEnt = spk.sql(sqlstr)
+       nodeCount = nodeEnt.count()
+       if (nodeCount == 0):
+           print('GnStaticFOps: node '+node+' does not exists')
+           return jobj
+       
        ##nodeEnt.show()
        jobj = json.loads(nodeEnt.toJSON().first())       
        return jobj
                        
     def datanode_flatten_jsonfields(self, baseDataNodeDF, spk):
-
+        print('Flattening datanode fields: ')
         # First flatten gndatanodeobj
-        n1_schema = spk.read.json(baseDataNodeDF.rdd.map(lambda row: row.gndatanodeobj)).schema
+        n1_df = spk.read.json(baseDataNodeDF.rdd.map(lambda row: row.gndatanodeobj))
+        
+        n1_df.show(2)
+        n1_schema = n1_df.schema
+        print(' Flattening n1_schema datanodeobj ')
+        print(n1_schema)
         n2_schema = spk.read.json(baseDataNodeDF.rdd.map(lambda row: row.gndatanodeprop)).schema
-
+        print('  Flattening n2_schema datanodeprop ')
+        print(n2_schema)
         
         datanodeFlattenDF = baseDataNodeDF.withColumn("gndatanodeobj", from_json("gndatanodeobj", n1_schema)) \
                           .withColumn("gndatanodeprop", from_json("gndatanodeprop", n2_schema)) \
@@ -80,7 +97,7 @@ class  GNGraphSrchStaticFileOps:
         
         if path.exists(dnode_fpath):
            retDF = spk.read.json(dnode_fpath)
-           ##retDF.show(1)
+           retDF.show(2)
            # flatten gndatanodeprop and gndatanodeobj (actual dataset attibutes)
            dnodeDF = self.datanode_flatten_jsonfields(retDF, spk)
            # also map the node to tempview with nodename
@@ -90,24 +107,34 @@ class  GNGraphSrchStaticFileOps:
 
 
     def   gnmetaedges_map_df(self, spk):
-
-        # map the datanode file to spark datafram
+        
+        # map the datanode file to spark dataframe
         edgefile = "gnmetaedges.json"
         edge_fpath = self.gndata_graph_data_folder+"/"+edgefile
+        print('GnStaticFOps: Mapping gnmetaedges ')
 
+        #if we already mapped df just return
+        if (self.__gnmetaEdges_mapped == 1):
+            print('GnStaticFOps: gnmetaedges are already mapped ')
+            return self.__gnmetaEdgeDF
+        
         retDF = None
         if path.exists(edge_fpath):
             metaEdgeDF = spk.read.json(edge_fpath)
-            ####metaEdgeDF.show(1)
-            # flatten gnedgeprop  (actual dataset attibutes)
+            metaEdgeDF.show(2)
             edge_schema = spk.read.json(metaEdgeDF.rdd.map(lambda row: row.gnedgeprop)).schema
-            self.__gnmetaEdgeDF = metaEdgeDF.withColumn("gnedgeprop", from_json("gnedgeprop", edge_schema)).select(col('gnedgeid'), col('gnedgename'), col('gnedgetype'), col('gnsrcnodeid'), col('gntgtnodeid'),  col('gnedgeprop.*'))
-           
+            print('GnStaticFOps: showing gnmetaedge schema ')
+            print(edge_schema)
+            self.__gnmetaEdgeDF = metaEdgeDF.withColumn("gnedgeprop", from_json("gnedgeprop", edge_schema)).select(col('gnedgeid'), col('gnedgename'), col('gnedgetype'), col('gnsrcnodeid'), col('gntgtnodeid'),  col('gnedgeprop.*')) 
+            self.__gnmetaEdgeDF.show(2)
             # also map the node to tempview with nodename
             self.__gnmetaEdgeDF.createOrReplaceTempView("gnmetaedges")
+            self.__gnmetaEdges_mapped = 1
         else:
             self.__gnmetaEdgeDF = None
+            self.__gnmetaEdges_mapped = 0
             
+        print('GnStaticFOps: gnmetaedges are mapped to df SUCCESS')    
         return self.__gnmetaEdgeDF
 
     
@@ -117,20 +144,26 @@ class  GNGraphSrchStaticFileOps:
         # map the datanode file to spark dataframe
         mnodefile = "gnmetanodes.json"
         mnodes_fpath = self.gndata_graph_data_folder+"/"+mnodefile
+        print('GnStaticFOps: Mapping gnmetanodes ')
 
+        if (self.__gnmetaNodes_mapped == 1):
+            print('GnStaticFOps: gnmetanodes are already mapped ')
+            return self.__gnmetaNodeDF
+        
         retDF = None
         if path.exists(mnodes_fpath):
            metaNodeDF = spk.read.json(mnodes_fpath)
-           ##metaNodeDF.show(1)
-           # flatten gnedgeprop  (actual dataset attibutes)
+           metaNodeDF.show(2)
            mnode_schema = spk.read.json(metaNodeDF.rdd.map(lambda row: row.gnnodeprop)).schema
+           print(mnode_schema)
            self.__gnmetaNodeDF = metaNodeDF.withColumn("gnnodeprop", from_json("gnnodeprop", mnode_schema)).select(col('gnnodeid'), col('gnnodename'), col('gnnodetype'), col('gnnodeprop.*'))
-
+           self.__gnmetaNodeDF.show(2)
            # also map the node to tempview with nodename
            self.__gnmetaNodeDF.createOrReplaceTempView("gnmetanodes")
+           self.__gnmetaNodes_mapped = 1
         else:
             self.__gnmetaNodeDF = None
-            
+        print("GnStaticFOps: gnmetanodes are mapped to df SUCCESS")    
         return self.__gnmetaNodeDF
 
     def  get_bizrule_metainfo(self, bizrid, spk):
