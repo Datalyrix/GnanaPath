@@ -250,6 +250,7 @@ def upload_file():
             #print(fres_table)
             ##fres_table = GNFileLogResults(items=fres)
             if (fingest == 'on'):
+
                 print(' File ingest is on ')
                 if (datasetname == ''):
                     nodename, fext = filename.split(".")
@@ -258,6 +259,7 @@ def upload_file():
                     nodename = datasetname
                 gn_log('GNAppSrv: Ingest file '+nodename+ ' Business  Domain '+bizdomain)    
                 gngraph_ingest_file_api(filename, ftype, fdelim, nodename, bizdomain, app.config["gnDataFolder"], app.config["gnGraphDBCredsFolder"], app.config["gnCfgSettings"])
+  
                 
         flash(f'File {filename} successfully uploaded', 'success')
         ####return redirect(url_for('gn_home', disp_srch=_srch))
