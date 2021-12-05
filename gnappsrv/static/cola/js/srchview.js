@@ -187,7 +187,6 @@
     function  gnFetchData() {
 
         //var srchstr = "SELECT * from customer;";
-	///var srv = 'http://45.79.206.248:5050';	
 	///var url = '/static/cola/js/product.json';
 	//var srchstr = document.getElementById('srchid').value;
 	var srchstr;
@@ -205,7 +204,7 @@
 	    return(s) ;
 	}
         else
-	    srchstr = "SELECT * from "+gnnode_sel;
+	    srchstr = "SELECT * from "+gnnode_sel+" LIMIT 1000";
 	
 	console.log('GNFetchData View: sql txt srch '+srchstr);
 	var nodes_url = "/api/v1/metanodes?srchqry='"+srchstr+"'";
@@ -255,10 +254,11 @@
 			nodes += ","+"\n";
 		    
                     nodes += '{';
-		    n = gndata.nodes[i];
+		    n = JSON.parse(gndata.nodes[i]);
                     nodes += '"data": {';
                     var idint = parseInt(n.id);
-                    ///console.log('GNView node-'+i+' id '+n.id);
+                    //console.log('GNView node-'+i+'  '+JSON.stringify(n));
+		    //console.log('GNView node-'+i+'  id '+n.id);
                     nodes+= '"id": "n'+n.id+'", ';
 		    nodes+= '"idInt": '+(idint)+',';
 		    nodes+= '"name": "'+n.nodename+'", ';
@@ -279,24 +279,24 @@
 		//console.log('GNView: data:'+JSON.stringify(data, null,3));
      
 		
-		var nodelen;
+		var edgelen;
 		edges = '';
 		
 		if (gndata.edges)
-		    nodelen = gndata.edges.length;
+		    edgelen = gndata.edges.length;
 		else
-		    nodelen = 0;
+		    edgelen = 0;
 		
 		///s = '{'+"\n";
 		///edges += '['+"\n";
 		//console.log('GNView: fetch Edges complete len:'+nodelen);
-		cy_edges = nodelen;
-		for (i=0; i < nodelen; i++) {	  
+		cy_edges = edgelen;
+		for (i=0; i < edgelen; i++) {	  
 		    if ( i > 0)
 			edges += ","+"\n";
 		    
 		    edges += '{';
-		    e = gndata.edges[i];
+		    e = JSON.parse(gndata.edges[i]);
 	            edges += '"data": {';
 		    var idint = parseInt(e.id);
 		    ///console.log('GNView node-'+i+' id '+n.id);
@@ -348,7 +348,7 @@
     }
 
     function  gnFetchMetaNodes() {
-        var nodes_url = "/api/v1/metaedges";
+        var nodes_url = "/api/v1/metanodes";
         var metanodes;
 
 	var gnHeaders = new Headers({
@@ -363,7 +363,7 @@
                .then (response => response.json())
                 .then (data => {
                      console.log('GNView: Fetch gnmeta nodes complete ');
-                     //console.log('GNView: data:'+JSON.stringify(data, null,3));
+
                     var status = data.status;
                     var nodelen;
 		    if (status == "ERROR") {
@@ -378,12 +378,14 @@
 		    ///$("#gnnode_selid").empty();
 		    ///$("#gnnode_selid").html("");
 		    nodelen = data.gndata.nodes.length;
-
+                    
 		    for (i=0; i < nodelen; i++) {
-                        n = data.gndata.nodes[i];
+                        n = JSON.parse(data.gndata.nodes[i]);
+			console.log('srchview: showing metanode '+n);
+			
 			if (n.nodetype == "GNMetaNode") {
                             /// Add to select options
-			    console.log('gnmetaview: adding node '+n.nodename);
+			    console.log('srchview: adding node '+n.nodename);
                             ///gnnode_selid.append($("<option></option>").attr("value", n.name).text(n.value));
 			    //$('#gnnode_selid').append("<option>" + n.name + "</option>");
 			    var c = document.createElement("option");
