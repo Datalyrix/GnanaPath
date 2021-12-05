@@ -9,6 +9,7 @@ import sys
 import time
 import logging
 import pyspark
+from pyspark import SparkConf
 from pyspark.sql import SparkSession
 
 curentDir = os.getcwd()
@@ -28,8 +29,11 @@ from gndwdb.gndwdb_neo4j_conn import gndwdb_neo4j_conn_check_api, gndwdb_neo4j_p
 ###from gngraph.ingest.gngraph_ingest_main import gngraph_init
 from gndatadis.gndd_filedb_ops import gndd_filedb_insert_file_api, gndd_filedb_filelist_get
 from gndatadis.gndd_filelist_table import GNFileLogResults
-from gngraph.search.gngraph_search_main import gngrph_search_init, gngrph_srch_metarepo_nodes_edges_fetch, gngrph_srch_datarepo_qry_fetch
+from gngraph.search.gngraph_search_main import gngrph_search_init, gngrph_srch_metarepo_qry_fetch_api, gngrph_srch_metarepo_qry_fetch_nodes_api, gngrph_srch_datarepo_qry_fetch_api
+from gngraph.search.gngraph_search_client import gngrph_metaqry_request, gngrph_datarepo_qry_request
+
 from gngraph.gngraph_dbops.gngraph_pgresdbops import GNGraphPgresDBOps, GNGraphPgresDBMgmtOps
+from gngraph.ingest.gngraph_ingest_pd import gngraph_ingest_file_api
 
 import flask
 from flask import request, jsonify, request, redirect, render_template, flash, url_for, session, Markup, abort
@@ -50,6 +54,7 @@ import json
 import pathlib
 from pyspark.sql import SparkSession
 
+
 # Append system path
 
 
@@ -62,7 +67,6 @@ def dequote(s):
     if (s[0] == s[-1]) and s.startswith(("'", '"')):
         return s[1:-1]
     return s
-
 
 app = flask.Flask(__name__)
 app.config["DEBUG"] = True
@@ -88,31 +92,44 @@ UPLOAD_FOLDER = app.config["gnUploadsFolder"]
 if not os.path.isdir(UPLOAD_FOLDER):
     os.mkdir(UPLOAD_FOLDER)
 
-    
-###app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+gngraph_init_flag = 0
+gnp_spark = None
+gnsrch_ops = None
+# set this flag to 1 if we want to use spark thread 
+gnp_thread_flag=1
 
-#### Initialize Spark Session
+def   __gn_graph_init():
+   global gngraph_init_flag
+   global gnp_spark
+   global gnsrch_ops
+   
+   print('GnAppSrv: Initializing Spark Session '+str(gngraph_init_flag))
+   if (gngraph_init_flag == 1):
+       print('GnAppSrv: Graph is already initialized ')
+       return 
+   
+   app_name="gngraph_spk"
+   gn_log('GnAppSrv: Initializing Spark Session ' )
 
-##gnGraphCls = gngraph_init(app.config["gnRootDir"])
+   conf = SparkConf()
+   conf.set('spark.executor.memory', '4g')
+   conf.set('spark.driver.memory', '4g')
 
-app_name="gngraph_spk"
-#spark = SparkSession.builder().appName(app_name).getOrCreate()
-##spark = SparkSession.builder.getOrCreate()
+   gnp_spark = SparkSession \
+           .builder \
+           .appName("gnp") \
+           .config("spark.some.config.option", "some-value") \
+           .getOrCreate()
 
-#spark.stop()
-gn_log('GNPMain: Getting spark session' )
-gnp_spark = SparkSession \
-        .builder \
-        .appName("gnp") \
-        .config("spark.some.config.option", "some-value") \
-        .getOrCreate()
-
-gn_log(' Spark session acquired ')
-#sc = pyspark.SparkContext(appName=app_name)
-
-### Initialize GNGraph Sessions
-gnsrch_ops = gngrph_search_init(gnp_spark,   app.config["gnDataFolder"],  app.config["gnGraphDBCredsFolder"],  app.config["gncfg_settings"])
-
+   gn_log('GnAppSrv: Spark session acquired ')
+   #sc = pyspark.SparkContext(appName=app_name)
+   gnp_spark.sparkContext.setLogLevel("INFO")
+   
+   ### Initialize GNGraph Sessions
+   print('GnAppSrv: Initializing Search Ops ')
+   gnsrch_ops = gngrph_search_init(gnp_spark,   app.config["gnDataFolder"],  app.config["gnGraphDBCredsFolder"],  app.config["gnCfgSettings"])
+   gngraph_init_flag = 1
+   print('GnAppSrv: gngraph Init COMPLETE SUCCESS '+str(gngraph_init_flag))
 
 # Allowed extension you can set your own
 ALLOWED_EXTENSIONS = set(['csv', 'json', ])
@@ -165,6 +182,10 @@ def       gn_pgresdb_getconfiguration(dbcredpath):
 def load_user(user_id):
     return all_users.get(user_id)
 
+@app.before_first_request
+def  init_components():
+    print('GnAppSrv: Running Init prior to start app ')
+    ###__gn_graph_init()
 
 @app.route('/', methods=['GET'])
 def gn_home():
@@ -229,12 +250,14 @@ def upload_file():
             #print(fres_table)
             ##fres_table = GNFileLogResults(items=fres)
             if (fingest == 'on'):
-                if (datasetname is None):
+                print(' File ingest is on ')
+                if (datasetname == ''):
                     nodename, fext = filename.split(".")
+                    gn_log(' Getting node name '+nodename)
                 else:
                     nodename = datasetname
-                print(' Ingest file '+nodename+ ' Biz Domain '+bizdomain)    
-                ##gngraph_ingest_file_api(filename, ftype, fdelim, nodename, bizdomain, gndata_folder, gngraph_creds_folder)
+                gn_log('GNAppSrv: Ingest file '+nodename+ ' Business  Domain '+bizdomain)    
+                gngraph_ingest_file_api(filename, ftype, fdelim, nodename, bizdomain, app.config["gnDataFolder"], app.config["gnGraphDBCredsFolder"], app.config["gnCfgSettings"])
                 
         flash(f'File {filename} successfully uploaded', 'success')
         ####return redirect(url_for('gn_home', disp_srch=_srch))
@@ -292,8 +315,6 @@ def  gdb_config_settings_page():
             else:
                 cfg_setting['dbmode'] = 0
 
-        print('Insert settings ')
-        print(cfg_setting)
         ##gdbcfg.insert_op(cfg_setting)
         gdbcfg.upsert_op(cfg_setting)
         return redirect(url_for('gn_home'))    
@@ -542,6 +563,7 @@ def gnsrch_api():
     if 'srchqry' in request.args:
         srchqry = request.args['srchqry']
         gn_log('GNSearch: search qry string:' + srchqry)
+        
         # Remove "' begining and end
         srchqry_filtered = dequote(srchqry)
         slen = len(srchqry_filtered)
@@ -551,12 +573,15 @@ def gnsrch_api():
 
         # call gnsearch api
         #res = gngrph_srch_sqlqry_api(srchqry_filtered, verbose)
-        gndata_folder=app.config["gnDataFolder"]
-        gngraph_creds_folder=app.config["gnGraphDBCredsFolder"]
+        #gndata_folder=app.config["gnDataFolder"]
+        #gngraph_creds_folder=app.config["gnGraphDBCredsFolder"]
         ###res = gngrph_srch_metarepo_nodes_fetch(srchfilter, spark, gndata_folder, gngraph_creds_folder)
 
-        
-        res = gngrph_srch_datarepo_qry_fetch(gnsrch_ops, gnp_spark, srchqry_filtered)
+        nodesonly = 1
+        if (gnp_thread_flag == 1):
+            res = gngrph_datarepo_qry_request(srchqry_filtered, nodesonly)
+        else:
+            res = gngrph_srch_datarepo_qry_fetch_api(gnsrch_ops, gnp_spark, srchqry_filtered, nodesonly)
         
         ###res_data = re.sub(r"(\w+):", r'"\1":', res)
         gn_log('GNPAppServer: Fetch Data Nodes with filter '+srchqry_filtered+' SUCCESS')
@@ -611,16 +636,19 @@ def gnmetanodes_fetch_api():
 
     ##res = gndwdb_metarepo_nodes_fetch_api(verbose)
     srchfilter=""
-    res = gngrph_srch_metarepo_nodes_fetch(gnsrch_ops, gnp_spark, srchfilter) 
+    if (gnp_thread_flag == 1):
+       res = gngrph_metaqry_request(srchfilter)
+    else:    
+       res = gngrph_srch_metarepo_qry_fetch_nodes_api(gnsrch_ops, gnp_spark, srchfilter) 
     ###res_data = re.sub(r"(\w+):", r'"\1":', res)
     gn_log('GNPAppServer:  metanode search  with filter '+srchfilter+'  SUCCESS : ')
     rjson = {
         "status": "SUCCESS",
-        "data": res_data
+        "gndata": res
     }
 
     # return json.JSONDecoder(object_pairs_hook=OrderedDict).decode()
-    return res_data
+    return rjson
 
     # return  json.dumps(rjson, indent=4, separators=(',', ': '))
 
@@ -647,7 +675,10 @@ def gnmetaedges_fetch_api():
 
     ##res = gndwdb_metarepo_edges_fetch_api(srchqry, verbose)
     srchfilter=""
-    res = gngrph_srch_metarepo_nodes_edges_fetch(gnsrch_ops, gnp_spark, srchfilter)
+    if (gnp_thread_flag == 1):
+        res = gngrph_metaqry_request(srchfilter)
+    else:
+        res = gngrph_srch_metarepo_qry_fetch_api(gnsrch_ops, gnp_spark, srchfilter)
     
     ##res_data = re.sub(r"(\w+):", r'"\1":', res)
     gn_log('GNPAppServer: metanodes and edges with filter '+srchfilter+' SUCCESS ')
@@ -672,5 +703,8 @@ def gn_log_stream():
     return app.response_class(generate(), mimetype='text/plain')
 
 if __name__ == '__main__':
-   
+    print(' Running Flask App ')
+    if (gnp_thread_flag == 0):
+        __gn_graph_init()
     app.run(host='0.0.0.0', port=5050, debug=True)
+    print(' Started Flask App ')
