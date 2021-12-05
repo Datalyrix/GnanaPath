@@ -13,27 +13,15 @@ RUN pip --no-cache-dir install pyspark==${PYSPARK_VERSION}
 
 LABEL maintainer="gnanapath project"
 EXPOSE 5050
+EXPOSE 4040
 USER root
 
 RUN apt-get update \
     && apt-get -y install libpq-dev gcc \
     && pip install psycopg2
 
-WORKDIR /opt/GnanaPath
-COPY gnappsrv/ gnappsrv/
-COPY gngraph/ gngraph/
-COPY gndatadis/ gndatadis/
-COPY gnsampledata/ gnsampledata/
-COPY gntests/ gntests/
-COPY __init__.py __init__.py
-COPY README.md README.md
-COPY gndwdb/ gndwdb/
-COPY gnsearch/ gnsearch/
-COPY gnutils/  gnutils/
-COPY creds/ creds/
-COPY startgnpath.sh startgnpath.sh
-WORKDIR gnappsrv/
+WORKDIR /opt/gnpdev
+COPY gnappsrv/requirements.txt requirements.txt
 RUN pip install -r requirements.txt
 
-
-CMD ["python"]
+CMD ["/bin/bash"]
