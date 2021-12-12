@@ -69,7 +69,16 @@ class     GNGraphSearchOps:
         self.__init_data = 0
         self.__init_meta = 0
         self.__gngrp_dnDFList = []
+        self.__gnmetaNodeDF = None
+        self.__gnmetaEdgeDF = None
+        self.__gnmeaNodeDF = None
+        self.__gnmetaNodesDF_cached = None
+        self.__gnmetaEdgesDF_cached = None
+        self.__gnmetaDerivedNodesDF_cached = None
+        self.__gnmetaNodesList = []
+        
         self.gngraph_config_init(gngrp_datadir, accessmode, fargs, dbargs)
+        self.gngraph_meta_nodes_edges_setup()
         print("GnSrchOps:  Search Initialization complete SUCCESS ")
 
         
@@ -240,9 +249,88 @@ class     GNGraphSearchOps:
             self.__init_meta = 1
         return
 
+    """
+        Map Gnmeta nodes and edges and cache them
+    """
 
-     
-    def      gngraph_search_setup(self, sqlst):
+    def      map_gnmeta_nodes_edges(self):
+        
+        print('GnSrchOps: Map and cache gnmeta nodes and edges ')
+        sqlst = "select * from gnmetanodes WHERE gnnodetype='GNMetaNode' OR gnnodetype='GNMetaNodeAttr'"
+
+        (resNodesDF, nJson) = self.gngraph_execute_sqlqry(sqlst)
+        self.__gnmetaNodesDF_cached = resNodesDF
+        
+        (eDF, dnDF) = self.gngraph_metarepo_qry_getedges(self.__gnmetaNodesDF_cached, sqlst, 0)
+        self.__gnmetaEdgesDF_cached = eDF
+        self.__gnmetaDerivedNodesDF_cached = dnDF
+        
+        self.__gnmetaNodesDF_cached.show(5)
+        self.__gnmetaEdgesDF_cached.show(5)
+    
+        ### get list of GNMetaNodes list
+        nDF = self.__gnmetaNodesDF_cached
+        n1DF = nDF.filter(col("gnnodetype") == "GNMetaNode") \
+                                  .withColumnRenamed("gnnodeid", "id") \
+                                  .withColumnRenamed("gnnodetype", "nodetype") \
+                                  .withColumnRenamed("gnnodename", "nodename")
+
+        
+        self.__gnmetaNodesList = n1DF.toJSON().collect()
+        print('GnSrchOps: MetaNodes List ')
+        print(self.__gnmetaNodesList)
+
+    def      gngrph_metarepo_nodes_get(self):
+        rJ = {}
+        nodeslen = len(self.__gnmetaNodesList)
+        rJ["nodes"] = self.__gnmetaNodesList
+        rJ["nodeslen"] = nodeslen
+        rJ["edges"] = []
+        rJ["edgeslen"] = 0
+        return rJ
+    
+    def      gngrph_metarepo_get(self):
+
+        print('GnSrchOps: getting metarepo information ')
+        if ((self.__gnmetaNodesDF_cached is None) and (self.__gnmetaEdgesDF_cached is None)):
+            #map gnnodes and edges
+            self.map_gnmeta_nodes_edges()
+
+        nnodes = self.__gnmetaNodesDF_cached.count()
+        njson = {}
+        ejson = {}
+            
+        if (nnodes > 0):
+            nDF = self.__gnmetaNodesDF_cached.select(col("gnnodeid").alias("id"), \
+                                  col("gnnodetype").alias("nodetype"), \
+                                  col("gnnodename").alias("nodename"))
+            njson = nDF.toJSON().collect()
+
+            nEdges = self.__gnmetaEdgesDF_cached.count()
+
+            if (nEdges > 0):
+                eResDF = self.__gnmetaEdgesDF_cached.select(col("gnedgeid").alias("id"), \
+                              col("gnedgetype").alias("type"), \
+                              col("gnsrcnodeid").alias("source"), \
+                              col("gntgtnodeid").alias("target"))
+            
+                ejson = eResDF.toJSON().collect()
+
+                if (self.__gnmetaDerivedNodesDF_cached is not None):
+                    nDNodes = self.__gnmetaDerivedNodesDF_cached.count()
+                else:
+                    nDNNodes = 0
+
+                if (nDNNodes > 0):
+                    dnDF = self.__gnmetaDerivedNodesDF_cached.select(col("gnnodeid").alias("id"), \
+                                  col("gnnodetype").alias("nodetype"), \
+                                  col("gnnodename").alias("nodename"))
+                    rDF = nDF.unionByName(dnDF, allowMissingColumns=True)    
+                    njson = rDF.toJSON().collect()
+            
+        return (njson, ejson)    
+            
+    def      gngraph_search_setup(self, sqlst, lnodes):
 
         gn_srch_sql = sqlst  
         print("GnSrchOps: Parsing sql st "+gn_srch_sql)  
@@ -284,14 +372,24 @@ class     GNGraphSearchOps:
                print('GnSrchOps: node entity '+node_name+' is mapped ')
             else:
                print("GnSrchOps: NodeDF setup "+node_name+" nodeDF is empty ")
+
+        self.__sql_formatted = sqlst
+        limit_rec = gn_ssql_parsed.get_limit_records()
+
+        if (limit_rec == -1):
+            limit_str = "LIMIT "+str(lnodes)
+            self.__sql_formatted = sqlst+" "+limit_str
+            
+               
         msg = f" Search Setup is successful"        
-        return (0, msg)
+        return (0, msg, self.__sql_formatted)
 
     def    gngraph_meta_nodes_edges_setup(self):
 
         self.get_metanodes_mapped_df()
         self.get_metaedges_mapped_df()
-
+        self.map_gnmeta_nodes_edges() 
+        
     
     def     gngraph_execute_sqlqry(self, sqlst):
         
@@ -304,182 +402,8 @@ class     GNGraphSearchOps:
         ##print(resJson)
         return (resDF, resJson)
 
-
-    def    gngraph_executeqry_getedges_o(self, dnodeDF, sqlst):
-
-         # first map gnedges
-         print('GNGraphSrchMain:GetEdges  sql stmt '+sqlst)
-         self.get_metaedges_mapped_df()
-         self.get_metanodes_mapped_df()
-         
-         cond=[(self.__gnmetaEdgeDF.gntgtnodeid == dnodeDF.gnnodeid) | (self.__gnmetaEdgeDF.gnsrcnodeid == dnodeDF.gnnodeid)]
-         jDF=self.__gnmetaEdgeDF.join(dnodeDF, cond , 'inner')
-
-         print('GNGraphSrchOps: edges for datanode generated')
-         ### turn edges result into json 
-         edgesJson = jDF.toJSON().map(lambda j: json.loads(j)).collect()
-         
-         ###jDF.select("gnnodeid", "gnedgeid", \
-         ###           "gnsrcnodeid", "gntgtnodeid").show(10)
-         
-         mcols = [F.col("gnsrcnodeid"), F.col("gntgtnodeid")] 
-         
-         res = jDF.withColumn("tgtnodes", F.array(mcols))\
-                  .select("gnedgeid", "gnnodeid", "tgtnodes")
-         ##_union(col("gntgtnodeid"), col("gnsrcnodeid")))
-         ##res.show(5)
-         
-         res2 = res.withColumn("srcnodes", F.array(F.col("gnnodeid")))\
-                  .select("*")
-         ##res2.show(10)
-                  
-         res3 = res2.withColumn("filternodes", \
-                                F.array_except(F.col("tgtnodes"), \
-                                F.col("srcnodes"))).select("*")
-         
-         ##res3.show()
-
-         #### Transpose column into list
-         fDF = res3.select("filternodes").distinct()
-         tgtNodeList = res3.select("filternodes").distinct().collect()
-         ##for x in tgtNodeList:
-         ##    print(x)
-
-         # Iterate over list and get node info from gnmetanodes
-         #fDF.printSchema()
-         #fDF.show()
-         f1DF = fDF.select(F.explode(F.col("filternodes")).alias("fnodes"))
-         #f1DF.printSchema()
-         #f1DF.show()
-         tgtNodeList = f1DF.select("fnodes").distinct().collect()
-         #print(tgtNodeList)
-         tgt_NodeList=[]
-         for row in tgtNodeList:
-            ###print(row['fnodes'])
-            tgt_NodeList.append(row['fnodes'])
-
-         ### now iterate over list and get gnnode
-         print('Preparing the tgtNodeList') 
-         nodelist=[]
-         for x in tgt_NodeList:
-            ###print(x)
-            nid = x
-            sqlstr="SELECT * from gnmetanodes where gnnodeid="+str(nid)+""
-            ##print(sqlstr)
-            jDF =  self.__spark.sql(sqlstr)
-            ##jDF.printSchema()
-            ##j = jDF.toJSON() 
-            resJson = jDF.toJSON().map(lambda j: json.loads(j)).collect()
-            ##print(resJson[0])
-            nodelist.append(resJson[0])
-
-         print('GNGraphSrchOps: tgtNode list enumerated')
-         ##print(nodelist)   
-         return (edgesJson, nodelist)   
-
+    
      
-    def    gngraph_metarepo_qry_getedges_o(self, rnodeDF, sqlst, derived_nodes_flag):
-
-         # first map gnedges
-         print('GnSrchOps: querying for edges and derived nodes flag '+str(derived_nodes_flag))
-         self.get_metaedges_mapped_df()
-         self.get_metanodes_mapped_df()
-         print('GnSrchOps: Enumerating edges and nodes on join ')
-         self.__gnmetaEdgeDF.show(4)
-         rnodeDF.show(4)
-         
-         cond=[((self.__gnmetaEdgeDF.gntgtnodeid == rnodeDF.gnnodeid) | (self.__gnmetaEdgeDF.gnsrcnodeid == rnodeDF.gnnodeid)) & (self.__gnmetaEdgeDF.gnedgetype == 'GNMetaNodeEdge')]
-         
-         jDF=self.__gnmetaEdgeDF.join(rnodeDF, cond , 'inner')
-         jDF.show(4)
-         jDF.count()
-         ##r = jDF.toJSON().map(lambda j: json.loads(j)).collect()
-         ##edgesJson = jDF.toJSON().first()
-         edgesJson = jDF.toJSON().collect()
-         print('GnSrchOps: meta edges for metanodes generated')
-         print(edgesJson)
-         ### turn edges result into json
-         ##edgesJson = jDF.toJSON().map(lambda j: json.loads(j)).collect()
-         ##jDF.select("gnnodeid", "gnedgeid", \
-         ###           "gnsrcnodeid", "gntgtnodeid").show(10)
-
-         mcols = [F.col("gnsrcnodeid"), F.col("gntgtnodeid")]
-
-         res = jDF.withColumn("tgtnodes", F.array(mcols))\
-                  .select("gnedgeid", "gnnodeid", "tgtnodes")
-         ##_union(col("gntgtnodeid"), col("gnsrcnodeid")))
-         print('GnSrchOps: gnedges filter result 1 ')
-         res.show(5)
-
-         res2 = res.withColumn("srcnodes", F.array(F.col("gnnodeid")))\
-                  .select("*")
-         print('GnSrchOps: gnedges filter result 2')
-         res2.show(5)
-
-         res3 = res2.withColumn("filternodes", \
-                                F.array_except(F.col("tgtnodes"), \
-                                F.col("srcnodes"))).select("*")
-         print('GnSrchOps: gnedges filter result 3 ')
-         res3.show(5)
-
-         #### Transpose column into list
-         fDF = res3.select("filternodes").distinct()
-         print('GnSrchOps: filter nodes ')
-         fDF.show(5)
-         tgtNodeList = res3.select("filternodes").distinct().collect()
-         ##tgtNodeList = fDF.collect()
-         #for x in tgtNodeList:
-         #    print(x)
-        
-         
-         # Iterate over list and get node info from gnmetanodes
-         ##fDF.printSchema()
-         fDF.show(5)
-         f1DF = fDF.select(F.explode(F.col("filternodes")).alias("fnodes"))
-         ###f1DF.printSchema()
-         f1DF.show(5)
-         tgtNodeList = f1DF.select("fnodes").distinct().collect()
-         print('GnSrchOps: generating target node list ')
-         print(tgtNodeList)
-         
-         tgt_NodeList=[]
-         for row in tgtNodeList:
-            ####print(row['fnodes'])
-            tgt_NodeList.append(row['fnodes'])
-
-         ### now iterate over list and get gnnode
-         print('GnSrchOps: preparing the target node list for search ')
-         print(tgt_NodeList)
-         nodelist=[]
-         nodeid_list = "( "
-         i = 0
-         for x in tgt_NodeList:
-             if (i > 0):
-                 nodeid_list += ","
-             nodeid_list += ""+str(x)+""
-             i = i+1
-         nodeid_list += ")"
-             
-         #for x in tgt_NodeList:
-         print(' getting node info for list '+nodeid_list)
-         sqlstr="SELECT * from gnmetanodes where gnnodeid in "+nodeid_list+" "
-         gn_log('GnGraphSearchOps: executing sql '+sqlstr)
-         jDF =  self.__spark.sql(sqlstr)
-         ##jDF.printSchema()
-         #j = jDF.toJSON()
-         #print(' Node info '+str(x))
-         #print(j)
-         resJson = jDF.toJSON().map(lambda j: json.loads(j)).collect()
-         #resJson = jDF.toJSON().first()
-         print(' Node info '+str(x))
-         print(resJson)
-         #nodelist.append(resJson[0])
-         nodelist = resJson
-         print('GNGraphSrchOps: tgtNode list enumerated')
-         ####print(nodelist)
-         
-         return (edgesJson, nodelist)
-
     """
         Get meta edges and the derived nodes based one edges
           The derived nodes are present in the edge but in the source list for example: Customer has edge to product id so when customer id is queried, then product info also shows up in sarch result
@@ -574,7 +498,7 @@ class     GNGraphSearchOps:
         return (eDF, dnDF)
 
 
-    def    gngraph_datarepo_qry_getedges(self, dnodeDF, sqlst):
+    def    gngraph_datarepo_qry_getedges(self, dnodeDF, sqlst, nodemode):
 
         # first map gnedges
         print('GnSrchOps:datanodes  querying for edges and derived nodes flages ')
@@ -740,7 +664,7 @@ def        gngrph_search_init(gnp_spark, gndata_folder, gngraph_creds_folder, ac
         return gnsrch_ops
 
     
-def        gngrph_srch_datarepo_qry_execute(gnsrch_ops, sqlst, nodesonly):
+def        gngrph_srch_datarepo_qry_execute(gnsrch_ops, sqlst, nodemode):
                 
     
     (resNodeDF, nodesjson) = gnsrch_ops.gngraph_execute_sqlqry(sqlst)
@@ -763,8 +687,8 @@ def        gngrph_srch_datarepo_qry_execute(gnsrch_ops, sqlst, nodesonly):
         
         njson = nDF.toJSON().collect()
 
-        if (nodesonly == 0):  
-            (eDF, dnDF) = gnsrch_ops.gngraph_datarepo_qry_getedges(resNodeDF, sqlst)
+        if (nodemode > 1):  
+            (eDF, dnDF) = gnsrch_ops.gngraph_datarepo_qry_getedges(resNodeDF, sqlst, nodemode)
             
             nEdges = eDF.count()
             if (dnDF is not None):
@@ -800,7 +724,7 @@ def          gngrph_srch_metarepo_qry_execute(gnsrch_ops, gnp_spark, sqlst, node
     
         njson = {}
         ejson = {}
-        gnsrch_ops.gngraph_meta_nodes_edges_setup()
+        ###gnsrch_ops.gngraph_meta_nodes_edges_setup()
 
         if (gnsrch_ops.srch_init_meta_status() == 0):
             gn_log('GnSrchOps: Meta data initialized is not completed ')
@@ -861,12 +785,12 @@ def          gngrph_srch_metarepo_qry_execute(gnsrch_ops, gnp_spark, sqlst, node
         
 
 
-def         gngrph_srch_datarepo_qry_fetch_api(gnsrch_ops, gnp_spark, sqlst, nodesonly):
+def         gngrph_srch_datarepo_qry_fetch_api(gnsrch_ops, gnp_spark, sqlst, nodemode, lnodes):
 
     
-    print('GnSrchOps: datanodes qry fetch ')
+    gn_log('GnSrchOps: datanodes qry fetch ')
 
-    (retval, msg) = gnsrch_ops.gngraph_search_setup(sqlst)
+    (retval, msg, sql_formatted) = gnsrch_ops.gngraph_search_setup(sqlst, lnodes)
 
 
     if (retval < 0):
@@ -880,18 +804,19 @@ def         gngrph_srch_datarepo_qry_fetch_api(gnsrch_ops, gnp_spark, sqlst, nod
         rJ["errmsg"] = msg
         return(rJ)
     
-    (nJson, eJson) = gngrph_srch_datarepo_qry_execute(gnsrch_ops, sqlst, nodesonly)
-    print('GnSrchOps: datanodes qry executed ')
-    print(nJson)
-    print('GnSrchOps: edges enumerated ')
-    print(eJson)
+    (nJson, eJson) = gngrph_srch_datarepo_qry_execute(gnsrch_ops, sql_formatted, nodemode)
+    ##print(nJson)
+    ##print(eJson)
+
     rJ = {}
     rJ["nodes"] = nJson
     rJ["nodelen"] = len(rJ["nodes"])
     rJ["edges"] = eJson
     rJ["edgelen"] = len(rJ["edges"])
     rJ["status"] = "SUCCESS"
-
+    print('GnSrchOps: datanodes qry enumerated '+str(rJ["nodelen"]))
+    print('GnSrchOps: datanodes edges enumerated '+ str(rJ["edgelen"]))
+    
     return(rJ)
 
 
@@ -899,7 +824,7 @@ def        gngrph_srch_metarepo_qry_fetch_nodes_api(gnsrch_ops, gnp_spark, srchf
     
     sqlst = "select * from gnmetanodes WHERE gnnodetype='GNMetaNode' OR gnnodetype='GNMetaNodeAttr'"
     
-
+    print("GnSrchOps: searching metarepo fetch srchfilter "+srchfilter)
     if (gnsrch_ops.srch_init_meta_status() == 0):
         rj={}
         rj["nodes"]=[]
@@ -909,12 +834,13 @@ def        gngrph_srch_metarepo_qry_fetch_nodes_api(gnsrch_ops, gnp_spark, srchf
         rJ["status"] = "ERROR"
         return rj
 
-
-    nodesonly = 1
-    (mnJson, meJson) = gngrph_srch_metarepo_qry_execute(gnsrch_ops, gnp_spark, sqlst, nodesonly)
+    if (srchfilter == ""):
+         (mnJson, meJson) = gnsrch_ops.gngrph_metarepo_get()
+    else:    
+         nodesonly = 1
+         (mnJson, meJson) = gngrph_srch_metarepo_qry_execute(gnsrch_ops, gnp_spark, sqlst, nodesonly)
         
     rJ = {}
-
     rJ["nodes"] = mnJson
     rJ["edges"] = meJson
     rJ["nodelen"] = len(rJ["nodes"])
@@ -939,10 +865,13 @@ def        gngrph_srch_metarepo_qry_fetch_api(gnsrch_ops, gnp_spark, srchfilter)
         rJ["edgelen"] = 0
         rJ["status"] = "ERROR"
         return rj
-
-
-    nodesonly = 0
-    (mnJson, meJson) = gngrph_srch_metarepo_qry_execute(gnsrch_ops, gnp_spark, sqlst, nodesonly)
+    print("GnSrchOps: searching for metarepo srchfilter :" + srchfilter)
+    
+    if (srchfilter == ""):
+        (mnJson, meJson) = gnsrch_ops.gngrph_metarepo_get()
+    else:
+        nodesonly = 0
+        (mnJson, meJson) = gngrph_srch_metarepo_qry_execute(gnsrch_ops, gnp_spark, sqlst, nodesonly)
         
     rJ = {}
 
@@ -996,7 +925,7 @@ def     gnspk_process_request_thrfn(gngrph_cls, gnp_spark, req):
 
 
     if (req["cmd"] == "metasearch"):
-        srchfilter = req["srchstring"]
+        srchfilter = req["args"]
         if (srchfilter == "null"):
             srchfilter = ""
         rJ = gngrph_srch_metarepo_qry_fetch_api(gngrph_cls, gnp_spark, srchfilter)
@@ -1005,9 +934,19 @@ def     gnspk_process_request_thrfn(gngrph_cls, gnp_spark, req):
         resp["status"] = "SUCCESS"
         resp["data"] = rJ
         return resp
+    if (req["cmd"] == "metanodes"):
+       rJ = gngrph_cls.gngrph_metarepo_nodes_get()
+       resp = {}
+       resp["cmd"] = req["cmd"]
+       resp["status"] = "SUCCESS"
+       resp["data"] = rJ
+       print('GnSrchOps: metanodes get resp')
+       print(resp)
+       return resp
+   
      ## datasearch
     if (req["cmd"] == "datasearch"):
-        sqlst = req["srchstring"]
+        sqlst = req["args"]
         
         if (sqlst == "null"):
             sqlst = ""
@@ -1017,10 +956,12 @@ def     gnspk_process_request_thrfn(gngrph_cls, gnp_spark, req):
             resp["data"] = []
             resp["errmsg"] = "No Search string"
             return resp
+        ###NodeMode  1 Nodes only  2 Nodes+Edges  3 Nodes+Edges+Derived nodes        
+        nodemode = req["nodemode"]
+        print(req)
+        lnodes = req["lnodes"]
         
-        nodesonly = req["nodeonly"]
-
-        rJ = gngrph_srch_datarepo_qry_fetch_api(gngrph_cls, gnp_spark, sqlst, nodesonly)
+        rJ = gngrph_srch_datarepo_qry_fetch_api(gngrph_cls, gnp_spark, sqlst, nodemode,lnodes)
         resp = {}
         resp["cmd"] = req["cmd"]
         resp["status"] = "SUCCESS"
@@ -1140,19 +1081,7 @@ def     gnp_spark_app_server_socket(gnRootDir):
         ##(cmd, args, nodeonly) = received.split(SEPARATOR)
         cmdJ = json.loads(received)
         print(cmdJ)
-
-        cmd = cmdJ["cmd"]
-        args = cmdJ["args"]
-        nodeonly = cmdJ["nodeonly"]
-        
-        print('cmd '+cmdJ["cmd"])
-        print(' args '+ cmdJ["args"])
-        print(' nodeonly '+str(nodeonly))
-        
-        tskmsg = {}
-        tskmsg["cmd"] = cmd
-        tskmsg["srchstring"] = args
-        tskmsg["nodeonly"] = nodeonly
+        tskmsg = cmdJ
         
         resp = gnp_spark_thread_send_receive_task(gnspk_thr_cfg, tskmsg)
         resp_str = json.dumps(resp)
