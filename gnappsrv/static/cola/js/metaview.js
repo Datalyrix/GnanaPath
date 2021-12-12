@@ -16,6 +16,7 @@
 
       return fetch(`/static/cola/stylesheets/${name}`).then( convert );
     };
+      
     let applyStylesheet = stylesheet => {
       if( typeof stylesheet === typeof '' ){
         cy.style().fromString( stylesheet ).update();
@@ -102,6 +103,7 @@
         default: return Promise.resolve(undefined);
       }
     };
+      
     let runAlgorithm = (algorithm) => {
       if (algorithm === undefined) {
         return Promise.resolve(undefined);
@@ -114,6 +116,7 @@
         return Promise.resolve(algorithm(options));
       }
     }
+      
     let currentAlgorithm;
     let animateAlgorithm = (algResults) => {
       // clear old algorithm results
@@ -186,7 +189,7 @@
 	///var srv = 'http://45.79.206.248:5050';	
 	///var url = '/static/cola/js/product.json';
 	var srchstr = document.getElementById('srchid').value;
-	var stlbl = document.getElementById('statuslbl');
+	var stlbl = document.getElementById('gnhdr_lbl');
         var errlbl = document.getElementById('errorlbl');
 	
 	console.log('GNFetchData View: sql txt srch '+srchstr);
@@ -225,6 +228,7 @@
 		var nodeslen = data.gndata.nodelen;
 		var edgeslen = data.gndata.edgelen;
 		
+		stlbl.innerHTML="    Nodes : "+nodeslen+"   Edges: "+edgeslen;
 		if (nodeslen > 0 && edgeslen > 0) {
 		    nodes = '';	      
 		    console.log('GNView: fetch complete len:'+nodeslen);
@@ -311,7 +315,7 @@
 		    ////s += '}'+"\n";
 		    console.log('GNView nodes & edges:  '+s);
 		    gn_elements = JSON.parse(s);
-		    stlbl.innerHTML = "Data Upload Complete";
+		    stlbl.innerHTML = "&#09; Data Upload : SUCCESS  "+"&emsp;&emsp; Nodes: "+nodeslen+"    Edges: "+edgeslen+"    &emsp;";
 		} else {
 		    gn_elements = {};
 		    stlbl.innerHTML = "Empty Metadata";
