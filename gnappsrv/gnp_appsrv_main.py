@@ -30,7 +30,7 @@ from gndwdb.gndwdb_neo4j_conn import gndwdb_neo4j_conn_check_api, gndwdb_neo4j_p
 from gndatadis.gndd_filedb_ops import gndd_filedb_insert_file_api, gndd_filedb_filelist_get
 from gndatadis.gndd_filelist_table import GNFileLogResults
 from gngraph.search.gngraph_search_main import gngrph_search_init, gngrph_srch_metarepo_qry_fetch_api, gngrph_srch_metarepo_qry_fetch_nodes_api, gngrph_srch_datarepo_qry_fetch_api
-from gngraph.search.gngraph_search_client import gngrph_metaqry_request, gngrph_datarepo_qry_request
+from gngraph.search.gngraph_search_client import gngrph_metaqry_request, gngrph_datarepo_qry_request, gngrph_metanodes_get_request
 
 from gngraph.gngraph_dbops.gngraph_pgresdbops import GNGraphPgresDBOps, GNGraphPgresDBMgmtOps
 from gngraph.ingest.gngraph_ingest_pd import gngraph_ingest_file_api
@@ -564,6 +564,17 @@ def gnsrch_api():
     # Get srchstring and then pass to search func
     if 'srchqry' in request.args:
         srchqry = request.args['srchqry']
+ 
+        if 'lnodes' in request.args:
+            lnodes = request.args['lnodes']
+        else:
+            lnodes = 1000
+
+        if 'nodemode' in request.args:
+            nodemode = int(request.args['nodemode'])
+        else:
+            nodemode = 1
+            
         gn_log('GNSearch: search qry string:' + srchqry)
         
         # Remove "' begining and end
@@ -573,15 +584,10 @@ def gnsrch_api():
         # Let us invoke gnsrch api
         gn_log('GNPAppServer: search qry : ' + srchqry_filtered)
 
-        # call gnsearch api
-        #res = gngrph_srch_sqlqry_api(srchqry_filtered, verbose)
-        #gndata_folder=app.config["gnDataFolder"]
-        #gngraph_creds_folder=app.config["gnGraphDBCredsFolder"]
-        ###res = gngrph_srch_metarepo_nodes_fetch(srchfilter, spark, gndata_folder, gngraph_creds_folder)
-
         nodesonly = 1
+        ##Nodemode: 1 Nodes only, 2 Nodes+Edges, 3 Nodes+Edges+Derived nodes
         if (gnp_thread_flag == 1):
-            res = gngrph_datarepo_qry_request(srchqry_filtered, nodesonly)
+            res = gngrph_datarepo_qry_request(srchqry_filtered, nodemode, lnodes)
         else:
             res = gngrph_srch_datarepo_qry_fetch_api(gnsrch_ops, gnp_spark, srchqry_filtered, nodesonly)
         
@@ -639,15 +645,25 @@ def gnmetanodes_fetch_api():
     ##res = gndwdb_metarepo_nodes_fetch_api(verbose)
     srchfilter=""
     if (gnp_thread_flag == 1):
-       res = gngrph_metaqry_request(srchfilter)
+       ##res = gngrph_metaqry_request(srchfilter)
+       res = gngrph_metanodes_get_request()
     else:    
        res = gngrph_srch_metarepo_qry_fetch_nodes_api(gnsrch_ops, gnp_spark, srchfilter) 
     ###res_data = re.sub(r"(\w+):", r'"\1":', res)
     gn_log('GNPAppServer:  metanode search  with filter '+srchfilter+'  SUCCESS : ')
-    rjson = {
-        "status": "SUCCESS",
-        "gndata": res
-    }
+    if (res["status"] == "SUCCESS"):
+        rjson = {
+           "status": "SUCCESS",
+           "gndata": res["data"]
+        }
+        
+    else:
+        rjson = {
+            "status": "ERROR",
+            "gndata": res["data"]
+            }
+        
+      
 
     # return json.JSONDecoder(object_pairs_hook=OrderedDict).decode()
     return rjson

@@ -42,11 +42,17 @@ class     GNGraphSqlParserOps:
         self.__alias_entlist = None
         self.__from_str = None
         self.gn_sqlp_from_processing(self.__sql_parsed_obj['from'])
-        self.__select_ent_list = self.gn_sqlp_select_processing(self.__sql_parsed_obj.get('select'))                              
+        self.__select_ent_list = self.gn_sqlp_select_processing(self.__sql_parsed_obj.get('select'))
+
                
     def get_entlist(self):
         return self.__entlist
 
+    def get_limit_records(self):
+        if 'limit' in self.__sql_parsed_obj:
+            return self.__sql_parsed_obj['limit']
+        else:
+            return -1
     
     def listwrap(self, value):
          if value is None:
@@ -311,11 +317,17 @@ def        gn_srch_sqlp_api(sqlst):
             selstr += ","
         selstr += " "+s
         first_flag+=1
-            
+ 
+    limit_rec = gn_sqlp_cls.get_limit_records()
+    if (limit_rec == -1):
+        limit_str = ""
+    else:
+        limit_str = "LIMIT "+str(limit_rec)
+        
     print(selstr)
     print(frm_str)
     print(where_str)
-
+    print(limit_str)
     
 if __name__ == "__main__":
 
@@ -325,7 +337,7 @@ if __name__ == "__main__":
     from salesorder as s JOIN customer as c 
     ON c.customerid=s.customerid 
     INNER JOIN product as p ON p.productid=s.productid AND p.productdate >2010
-    where s.salesdate > 2010
+    where s.salesdate > 2010 LIMIT 10000
 """
     gn_srch_sqlp_api(iSQL)
     

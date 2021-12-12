@@ -14,7 +14,8 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .site-header .navbar-nav .nav-link {
-  color: #cbd5db;
+    color: #cbd5db;
+    font-size: 14px;
 }
 
 .site-header .navbar-nav .nav-link:hover {
@@ -25,12 +26,34 @@ h1, h2, h3, h4, h5, h6 {
   font-weight: 500;
 }
 
+.site-header .navbar-brand {
+    font-size: 24px;
+}
+
+.site-header .nav-item {
+    font-size: 14px
+}
+
+.fixed-top-2 {
+    margin-top: 52px;
+}
+
 .content-section {
   background: #ffffff;
   padding: 10px 20px;
   border: 1px solid #dddddd;
   border-radius: 3px;
   margin-bottom: 20px;
+  font-size: 16px;
+}
+
+.srchpanel {
+  background: #ffffff;
+  padding: 10px 20px;
+  border: 1px solid #dddddd;
+  border-radius: 3px;
+  margin-bottom: 2px;
+  font-size: 16px;
 }
 
 .article-title {

@@ -2,8 +2,20 @@
  <head> 
      
  </head>
-    <!-- Bootstrap CSS -->
-    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css">
+    <!-- Bootstrap CSS 
+      <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css">
+      -->
+      
+    <!-- Bootstrap Material design -->
+      <link rel="stylesheet" href="https://unpkg.com/bootstrap-material-design@4.1.1/dist/css/bootstrap-material-design.min.css" integrity="sha384-wXznGJNEXNG1NFsbm0ugrLFMQPWswR3lds2VeinahP8N0zJw9VWSopbjv2x7WCvX" crossorigin="anonymous">
+ 
+      <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js" integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous"></script>
+      <script src="https://unpkg.com/popper.js@1.12.6/dist/umd/popper.js" integrity="sha384-fA23ZRQ3G/J53mElWqVJEGJzU0sTs+SvzG8fXVWP+kJQ1lwFAOkcUOysnlKJC33U" crossorigin="anonymous"></script>
+      <script src="https://unpkg.com/bootstrap-material-design@4.1.1/dist/js/bootstrap-material-design.js" integrity="sha384-CauSuKpEqAFajSpkdjv3z9t8E7RlpJ1UP0lKM/+NdtSarroVKu069AlsRPKkFBz9" crossorigin="anonymous"></script>
+     <script>$(document).ready(function() { /*$('body').bootstrapMaterialDesign();*/ });</script>
+  
+    <!---  end Materialdesign -->
+            
     <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='main.css') }}">
  
    <link rel="stylesheet" href="{{ url_for('static', filename='cola/css/normalize.css')}}" />
@@ -27,40 +39,7 @@
   <title>GnanaInsight DataView Panel</title>
 
 <style>
-.slidecontainer {
-  width: 100%;
-}
 
-.slider {
-  -webkit-appearance: none;
-  width: 100%;
-  height: 25px;
-  background: #d3d3d3;
-  outline: none;
-  opacity: 0.7;
-  -webkit-transition: .2s;
-  transition: opacity .2s;
-}
-
-.slider:hover {
-  opacity: 1;
-}
-
-.slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 25px;
-  height: 25px;
-  background: #4CAF50;
-  cursor: pointer;
-}
-
-.slider::-moz-range-thumb {
-  width: 25px;
-  height: 25px;
-  background: #4CAF50;
-  cursor: pointer;
-}
 </style>
 
 
@@ -78,7 +57,7 @@
               <a class="nav-item nav-link" href="{{ url_for('gn_home') }}">Home</a>
             </div>
 
-   <!-- Navbar Right Side -->
+           <!-- Navbar Right Side -->
             <div class="navbar-nav">
               {% if current_user.is_authenticated %}
 
@@ -98,54 +77,107 @@
           </div>
         </div>
       </nav>
+      
+      <!-- Search Panel -->
+      <nav class="navbar navbar-expand-md navbar-dark bg-steel fixed-top-2">	
+          <div class="srchpanel" style="width: 80%">
+
+	    <b> Data Search Panel </b>
+	    
+             <div class="input-group mt-3">
+      
+                  <input type="text" id="gnsrch_inp_id" class="form-control" placeholder="Enter Search String" aria-label="Enter Search String" aria-describedby="basic-addon2" style="color:black;font-size:18px">
+                   <div class="input-group-append">
+                      <button class="openbtn" type="button" id="srchbtn">Search </button>
+	              <button class="openbtn" onclick="openNav()">☰ More Options</button>  
+                   </div>
+             </div>
+	     <div class="input-group-append mx-1">
+                 <label id="gnhdr_lbl" style="font-size:18px"></label>
+   	         <label id="gnerr_lbl" style="color:red;font-size:16px"></label> 
+	     </div>       
+          </div>
+
+          <div style="width:20%">
+	      
+
+             
+    
+   
+
+	   </div>   
+
+       </nav>
+
     </header>
 
+    <div id="mySidebar" class="sidebar">
+
+          <a href="javascript:void(0)" class="closebtn" onclick="closeNav()">×</a>
+	  <div class="cyopts" class="mx-auto">
+	     <h5> Filter Search Options </h5>
+
+             <select id="gnnode_selid" name="gnnode_selid">
+                <option value="select">Select Node</option>
+             </select>
+	     
+	     <div class="input-group-text">
+               <p> select nodes to limit search </p>
+             </div>
+	     <hr />
+	     
+             <hr />
+        </div>	  
+   </div>
 	    
  <div  class="content-section">
-   <hr />
-  <h5>Gnana Search</h5>
-  <label id="gnhdr_lbl"></label>
-  <div id="cy" class="cymain">
-  </div>
+     
+     <div id="cy" class="cymain">  </div>
 
+  <!--   Cy Right Bar -->
   <div class="cytools">
-    <h5>Select Nodes </h5>
-    <p> Select metanode and its datanodes to view </p>
-    <select id="gnnode_selid" name="gnnode_selid">
-      <option value="select">Select Node</option>
-    </select>
-    <button id="srchbtn">View</button>
-    <label id="selstatuslbl"></label>
-    <label id="selerrlbl" style="color:red"></labebl>
-    <hr>
+              <h6> Node Information </h6>
 
- <!--   <h5>Search Panel</h5>
-    <p>Please enter SQL search string ex: SELECT * from customer </p>
-    <input id="srchid" type="text" />
-    <button id="srchbtn">Search</button>
-    <label id="statuslbl"></label>
-    <label id="errorlbl" style="color:red"></label>
-    <hr>
-   --> 
-   <!-- <h6>Zoom View</h6>
+              <!-- <label id="selstatuslbl"></label>
+		   <label id="selerrlbl" style="color:red"></label> -->
+		 <p>
+		   <label id="selnodename"></label>
+		   <label id="selnodeid"></label>
+		   <label id="selnodetype"></label>
+		 </p>   
+              <div>         
+                   <button id="redo-layout" class="fa fa-refresh action-icon tooltop">Reset Layout</button>
+	      </div>
+	       <p>
+                 <a class="btn btn-primary" data-toggle="collapse" href="#multiCollapseExample1" role="button" aria-expanded="false" aria-controls="multiCollapseExample1">Result Table</a>
+               </p>
 
-      <div class="slidecontainer">
-       <input type="range" min="1" max="100" value="50" id="gnzoomid" />  
-        <!-- <p>Node Space</p>
-         <input type="range" min="1" max="100" value="50" class="slider" id="gnnodespaceid">
-      </div>
-    -->  
+	       <div id="gndatatable" class="row">
 
-       <div>
-          <!--
-          <label for="redo-layout" style="padding-right: 5px;" class="tooltip u-pull-left" title="Redo layout">Redo layout</label>
-          <i id="redo-layout" class="fa fa-refresh action-icon tooltip" title="Redo layout"></i>
-  
-          <!--<h6> You may have to refresh several times. Click on the <i>Redo</i> button</p> -->
-          <button id="redo-layout" class="fa fa-refresh action-icon tooltop" title="Redo Layout"> Redo Layout</button>
-	  
-      </div>
-       <hr>
+                   <div class="col">
+                        <div class="collapse multi-collapse" id="multiCollapseExample1">
+                            <div class="card card-body">
+                               Result Table		 
+                            </div>
+                         </div>
+                   </div>   
+               </div>
+	       
+  </div>
+           
+         
+     
+       <!-- 
+           <h6>Zoom View</h6>
+
+             <div class="slidecontainer">
+                   <input type="range" min="1" max="100" value="50" id="gnzoomid" />  
+                   <p>Node Space</p>
+                   <input type="range" min="1" max="100" value="50" class="slider" id="gnnodespaceid">
+            </div>
+       -->  
+
+
        
   <!--  Temparorily Disable Graph Alg      
     <h4>Graph Algorithms</h4>
@@ -161,11 +193,24 @@
         <option value="dfs">DFS</option>
       </select>
     <i id="redo-algorithm" class="fa fa-refresh action-icon tooltip" title="Redo algorithm visualization"></i>
- -->
-
-
-  </div>
+    -->
+   
+     
+  <!-- </div>  cytools -->
 
 </div>
+
+<script>
+function openNav() {
+  document.getElementById("mySidebar").style.width = "450px";
+  ///document.getElementById("main").style.marginLeft = "250px";
+}
+
+function closeNav() {
+  document.getElementById("mySidebar").style.width = "0";
+  ///document.getElementById("main").style.marginLeft= "0";
+}
+</script>
+
 </body>
 </html>
