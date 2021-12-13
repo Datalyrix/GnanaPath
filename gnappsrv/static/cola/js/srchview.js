@@ -190,23 +190,34 @@
        //// zoom options	  
       });
 
-      tryPromise( applyDatasetFromSelect ).then( applyStylesheetFromSelect ).then( applyLayoutFromSelect );
+      ///tryPromise( applyDatasetFromSelect ).then( applyStylesheetFromSelect ).then( applyLayoutFromSelect );
 
       tryPromise( applyMetaDataset).then( applyStylesheetFromSelect ).then( applyLayoutFromSelect );
       
       let applyDatasetChange = () => tryPromise(applyDatasetFromSelect).then(applyStylesheetFromSelect).then(applyLayoutFromSelect);
       
-    $('#redo-layout').addEventListener('click', applyLayoutFromSelect);
+    ///$('#redo-layout').addEventListener('click', applyLayoutFromSelect);
 ////Disable algorithm
     ///$algorithm.addEventListener('change', applyAlgorithmFromSelect);
     ///$('#redo-algorithm').addEventListener('click', applyAlgorithmFromSelect);
+      $('#clear-graph').addEventListener('click', removeAllNodes);
 
       
     //////////////////////////////////
     ///$('#srchbtn').addEventListener('click', applyDatasetChange);
-    $('#srchbtn').addEventListener('click', gnFetchDataforMetaNodes);
+     $('#srchbtn').addEventListener('click', gnFetchDataforMetaNodes);
 
+      function  removeAllNodes() {
 
+	  cy.elements().remove();
+	  cy_dnodes = 0;
+	  cy_dedges = 0;
+	  applyMetaDataset();
+	  applyStylesheetFromSelect();
+	  applyLayoutFromSelect();
+	  
+      }
+    
       function gnapplynode() {
 
           var d = '';
@@ -242,10 +253,15 @@
 	console.log('Gndata fetch for metanodes');
 	var stlbl = document.getElementById('gnhdr_lbl');
 	var errlbl = document.getElementById('gnerr_lbl');
+	var loader_id = document.getElementById('loaderid');
 	var srch_inp = document.getElementById('gnsrch_inp_id');
 	var srchstr = srch_inp.value;
-	var lnodes = 1000;
-        var nmode = 2; /// Nodemode 1 for nodesonly 2 for Nodes+edges+derived nodes
+	var lnodesid = document.getElementById('gnnode_lnodesid');
+	var lnodes = lnodesid.value;
+	var nodemode_id = document.getElementById('gnnode_modeid');
+	
+        var nmode = nodemode_id.value; /// Nodemode 1 for nodesonly 2 for Nodes+edges+derived nodes
+	
 	
 	var gnHeaders = new Headers({
             'Content-Type': 'text/plain',
@@ -260,6 +276,9 @@
 	}
 	
 	console.log('GNFetchData View: sql txt srch '+srchstr);
+	console.log('GNFetchData View:  nmode '+nmode+'   limit nodes '+lnodes);
+
+	
 	var nodes_url = "/api/v1/metanodes?srchqry='"+srchstr+"'";
 	var dataedges_url = "/api/v1/search?srchqry='"+srchstr+"'&lnodes="+lnodes+"&nodemode="+nmode;
 	var nodes;
@@ -272,6 +291,7 @@
 	});
 
 	stlbl.innerHTML ="Loading data for metanodes";
+	loader_id.style.display = "block";
 	cy_nodes = 0;
 	cy_edges = 0;
 
@@ -291,6 +311,7 @@
 		if (status == "ERROR") {
                     console.log('GNView: Error status ');
                     errlbl.innerHTML = "Error getting data from database";
+		    loader_id.style.display = "none";
 		    s = '[]';
 		    gn_elements = JSON.parse(s);
 		    return(gn_elements);
@@ -411,6 +432,7 @@
 		setNodesMethod();
 		
 		console.log('GnView: fetch process is completed');
+		loader_id.style.display = "none";
 		stlbl.innerHTML = "MetaNodes: "+cy_mnodes+"&emsp;&emsp; DataNodes:"+cy_dnodes+" &emsp;&emsp;&emsp;&emsp; Data Upload: SUCCESS";
 		return (gn_elements);
 		////////////////////////////////
@@ -604,6 +626,7 @@
 	
         var stlbl = document.getElementById('gnhdr_lbl');
         var errlbl = document.getElementById('gnerr_lbl');
+	var loader_id = document.getElementById('loaderid');
 	
 	var gnHeaders = new Headers({
             'Content-Type': 'text/plain',
@@ -611,7 +634,8 @@
         });
 
 	stlbl.innerHTML = " Fetching  metanodes for search ";
-
+        loader_id.style.display = "block";
+	
 	try {
          
 	     return fetch(nodes_url, { method: 'GET', headers: gnHeaders })
@@ -625,7 +649,8 @@
 		    if (status == "ERROR") {
 			 console.log('GNView: Error status ');
 			 stlbl.innerHTML = "";
-                         errlbl.innerHTML = "Error getting metanode data from server";
+                        errlbl.innerHTML = "Error getting metanode data from server";
+			loader_id.style.display = "none";
                         return;
 		    }
 		    
@@ -671,7 +696,7 @@
 			    //$('#gnnode_selid').append("<option>" + n.name + "</option>");
 			    var c = document.createElement("option");
 			    c.text = n.nodename;
-			    gnnode_selid.options.add(c,1);
+			    ////gnnode_selid.options.add(c,1);
 			    
 			}
 		    }
@@ -681,6 +706,7 @@
 		    s += ']'+"\n";
 		    gn_elements = JSON.parse(s);
 		    //console.log(' GnFetch MetaNodes '+JSON.stringify(gn_elements, null, 2));
+		    loader_id.style.display = "none";
 		    stlbl.innerHTML = " MetaNodes: "+cy_mnodes+" &emsp;&emsp; Click on nodes to get data";
 		    return(gn_elements);
 		});

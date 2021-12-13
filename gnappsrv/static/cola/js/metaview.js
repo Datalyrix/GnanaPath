@@ -190,7 +190,8 @@
 	///var url = '/static/cola/js/product.json';
 	var srchstr = document.getElementById('srchid').value;
 	var stlbl = document.getElementById('gnhdr_lbl');
-        var errlbl = document.getElementById('errorlbl');
+        var errlbl = document.getElementById('gnerr_lbl');
+	var loader_id = document.getElementById('loaderid');
 	
 	console.log('GNFetchData View: sql txt srch '+srchstr);
 	var nodes_url = "/api/v1/metanodes?srchqry='"+srchstr+"'";
@@ -203,12 +204,12 @@
 	    'Access-Control-Allow-Origin' : '*'
 	});
 	
-	stlbl.innerHTML = "Loading data ";
-	    
+	stlbl.innerHTML = "Loading metadata ";
+	loader_id.style.display = "block";
+	
 	///console.log('GNView: Fetch data1 ');
 	try {
    	   return fetch(edges_url, { method: 'GET', headers: myHeaders })
-	////	    fetch(edges_url, { method: 'GET',  headers: myHeaders })
 	
             .then (response => response.json())
             .then (data => {
@@ -218,7 +219,9 @@
          
 		if (status == "ERROR") {
                     console.log('GNView: Error status ');
+		    stlbl.innerHTML = "Network Transfer failed"
                     errlbl.innerHTML = "Error getting data from database";
+		    loader_id.style.display = "none";
 		    s = '[]';
 		    gn_elements = JSON.parse(s);
 		    return(gn_elements);
@@ -228,7 +231,7 @@
 		var nodeslen = data.gndata.nodelen;
 		var edgeslen = data.gndata.edgelen;
 		
-		stlbl.innerHTML="    Nodes : "+nodeslen+"   Edges: "+edgeslen;
+	
 		if (nodeslen > 0 && edgeslen > 0) {
 		    nodes = '';	      
 		    console.log('GNView: fetch complete len:'+nodeslen);
@@ -315,9 +318,12 @@
 		    ////s += '}'+"\n";
 		    console.log('GNView nodes & edges:  '+s);
 		    gn_elements = JSON.parse(s);
+		    loader_id.style.display = "none";
 		    stlbl.innerHTML = "&#09; Data Upload : SUCCESS  "+"&emsp;&emsp; Nodes: "+nodeslen+"    Edges: "+edgeslen+"    &emsp;";
+		    
 		} else {
 		    gn_elements = {};
+		    loader_id.style.display = "none";
 		    stlbl.innerHTML = "Empty Metadata";
 		}
 
