@@ -40,6 +40,7 @@
 
 <style>
 
+
 </style>
 
 
@@ -94,7 +95,13 @@
              </div>
 	     <div class="input-group-append mx-1">
                  <label id="gnhdr_lbl" style="font-size:18px"></label>
-   	         <label id="gnerr_lbl" style="color:red;font-size:16px"></label> 
+   	         <label id="gnerr_lbl" style="color:red;font-size:16px"></label>
+		 <!--
+		 <div class="spinner-border" role="status">
+                          <span class="sr-only">Loading...</span>
+                 </div>
+                 -->
+                 <div class="loader" id="loaderid" style="display:none"></div>
 	     </div>       
           </div>
 
@@ -116,16 +123,23 @@
           <a href="javascript:void(0)" class="closebtn" onclick="closeNav()">×</a>
 	  <div class="cyopts" class="mx-auto">
 	     <h5> Filter Search Options </h5>
-
-             <select id="gnnode_selid" name="gnnode_selid">
-                <option value="select">Select Node</option>
+             <hr />
+             <select id="gnnode_modeid" name="gnnode_modeid">
+               <option value="1">Nodes Only</option>
+	       <option value="2">Nodes+Edges+Derived Nodes </option>
              </select>
 	     
-	     <div class="input-group-text">
-               <p> select nodes to limit search </p>
+	     <div>
+               <p class="note note-info">
+		 You can select the search output to one of the above modes.
+		 Nodes Only for just nodes without any edges or Edges+Derviednodes for nodes and edges and derived nodes. Derived nodes are nodes that have edge with select nodes Example if Customer has connection to the product, those edges will show up.
+	       </p>
              </div>
 	     <hr />
-	     
+             <div>
+	       <label> Limit maximum datanodes to : </label>
+	       <input id="gnnode_lnodesid" type="text" value="100"></input>
+	     </div>
              <hr />
         </div>	  
    </div>
@@ -146,9 +160,11 @@
 		   <label id="selnodetype"></label>
 		 </p>   
               <div>         
-                   <button id="redo-layout" class="fa fa-refresh action-icon tooltop">Reset Layout</button>
+                 
+		<button id="clear-graph" class="fa fa-refresh action-icon tooltop">Clear Graph</button>
 	      </div>
-	       <p>
+	      <p>
+		<!-- <button id="redo-layout" class="fa fa-refresh action-icon tooltop">Reset Layout</button> -->
                  <a class="btn btn-primary" data-toggle="collapse" href="#multiCollapseExample1" role="button" aria-expanded="false" aria-controls="multiCollapseExample1">Result Table</a>
                </p>
 
