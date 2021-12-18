@@ -24,9 +24,17 @@ class  GNGraphStaticFileOps:
             self.gnmetanode_filepath = self.gndata_graph_data_folder+"/"+"gnmetanodes.json"
             self.gnmetaedge_filepath = self.gndata_graph_data_folder+"/"+"gnmetaedges.json"
             self.gnmetabizrules_filepath = self.gndata_graph_data_folder+"/"+"gnmetabizrules.json"  
-           
-    def  metadb_nodes_append_write(self, metaDF):
 
+    def  metadb_load_metanode_df(self):
+
+        if path.exists(self.gnmetanode_filepath):
+            jDF = pds.read_json(self.gnmetanode_filepath)
+        else:
+            jDF = None
+            
+        return jDF
+        
+    def  metadb_nodes_append_write(self, metaDF):
 
         if path.exists(self.gnmetanode_filepath):
             cDF = pds.read_json(self.gnmetanode_filepath)
