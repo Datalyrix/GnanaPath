@@ -1,6 +1,7 @@
 import socket
 import os
 import json
+import psutil
 
 SEPARATOR = ","
 BUFFER_SIZE = 4096
@@ -47,7 +48,7 @@ def     gngrph_search_client_sendreq(t):
     except socket.error as err:
         print(' Gngrph socket client error '+str(err))
         resp_j = {}
-        resp_j["cmd"] = tskcmd
+        resp_j["cmd"] = t["cmd"]
         resp_j["status"] = "ERROR"
         rJ = {}
         rJ["nodes"] = []
@@ -118,6 +119,8 @@ def      gngrph_datarepo_qry_request(srchstr, nodemode, lnodes):
     #print(rdata)    
     return rdata
 
+
+        
 if   __name__ == "__main__":
     
     print(' Starting gngraph client ')
