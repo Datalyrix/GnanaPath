@@ -50,7 +50,7 @@ sh ./gn_docker_cleanup.sh
 
 
 
-##  GNGraph Storage
+<h4> GNGraph Storage</h4>
 Currently gnanapath stores graphed data  as static files (static files mode)  and store it to a backend database (dbmode). Currently Postgres is supported as backend database.
 
 By default, the static files mode is always turned on.
@@ -62,8 +62,7 @@ Under Graph Config section, you can enable static file mode and db mode and also
 
 
 
-
-#### Setting up Postgres container
+<h5> Setting up Postgres container</h5>
 You can run postgres as container and connect with GNPath
 
 #docker pull postgres:alpine
