@@ -407,8 +407,23 @@ class       GNGraphPgresDBMgmtOps:
         
         ## Create default Business Domains
         self.db_create_schema(newdbname, "CUSTOMER_DOMAIN")
-        self.db_create_schema(newdbname, "PRODUCT_DOMAINd")
+        self.db_create_schema(newdbname, "PRODUCT_DOMAIN")
         self.db_create_schema(newdbname, "SALES_DOMAIN")
         gn_log('GNGraphDBInit: schemas CUSTOMER_DOMAIN, PRODUCT_DOMAIN, SALES_DOMAIN are created ')
         gn_log('GNGraphDBInit: GNGraph Intialization Successful ')
         return 0
+
+
+
+
+def     gngrph_pgres_get_connection_status(pgres_conf):
+
+    pgdb_cls = GNGraphPgresDBOps(pgres_conf['serverIP'], pgres_conf['serverPort'], pgres_conf['username'], pgres_conf['password'], dbname, "")
+    is_connect = pgdb_cls._isconnected()
+
+    if (is_connect == 1):
+        connection_status = "Connected"
+    else:
+        connection_status = "NotConnected"
+
+    return connection_status
