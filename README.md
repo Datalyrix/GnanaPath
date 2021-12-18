@@ -16,37 +16,36 @@ It is built using following
 
 The framework can be execute as part of docker containers
 
-<h2>This project is still under construction. Please check for updates on this page </h2>
+<h3>This project is still under construction. Please check for updates on this page </h3>
 
+<h4> Using Gnanapath</h4>
 
-<h3> Using Gnanapath</h3>
-
-<h4> Setup using Dockerfile </h4>
+<h5> Setup using Dockerfile </h5>
 
  After checking out repo. Go to the local repo directory
 
 cd GnanaPath
+
 Choose the appropriate Dockerfiler (pyspark or Jupyter Notebook)
 for pyspark-based container:
 
 \$ ln -s Dockerfile.pyspark Dockerfile
 
 \# run docker build and run container
-# sh ./gn_docker_create_run.sh
-
+\# sh ./gn_docker_create_run.sh
 or run step-by-step commands
 
 \# docker build -t gnpath .
 
 After the docker image is created run the image
 
-#docker run -d -p 5050:5050 --name gnpath_server gnpath:latest
+\#docker run -d -p 5050:5050 --name gnpath_server gnpath:latest
 
 After that open browser http://<dockerhostip>:5050
 
 Login/passwd: gnadmin/gnana
 
-## To clean up container
+<h5> To clean up container </h5>
 sh ./gn_docker_cleanup.sh
 
 
