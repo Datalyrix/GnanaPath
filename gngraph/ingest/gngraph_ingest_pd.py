@@ -31,8 +31,8 @@ class     GNGraphIngestOps:
             #except Exception as err:
             #    print(err)
             gn_log('GNIngest: file is parsed and created dataframe')
-        ### Establish metadb conn and datadb conn    
 
+        ### Establish metadb conn and datadb conn    
         if (self.__gdbargs["gdbflag"]):
             self.gdb_conn_setup()
 
@@ -54,11 +54,10 @@ class     GNGraphIngestOps:
             
     def    gdb_conn_setup(self):
 
-        with open(self.__gdbargs["gdbcredsfpath"], encoding="utf-8") as fh:
-             gdb_creds = json.load(fh)
-
+        ###with open(self.__gdbargs["gdbcredsfpath"], encoding="utf-8") as fh:
+        ###     gdb_creds = json.load(fh)
+        gdb_creds = gn_pgresdb_getconfiguration(self.__gdbargs["gdbcredsfpath"])        
         self.__gdbMetaDBConnp = GNGraphPgresDBOps.from_args(gdb_creds["dbserver"], gdb_creds["dbport"], gdb_creds["dbuser"], gdb_creds["dbpasswd"], self.__gdbargs["gnmetaDB"], "gnmetadb")         
-
         self.__gdbDataDBConnp = GNGraphPgresDBOps.from_args(gdb_creds["dbserver"], gdb_creds["dbport"], gdb_creds["dbuser"], gdb_creds["dbpasswd"],  self.__gdbargs["gndataDB"], "gndatadb")
 
     def     get_metanodeid_byname(name):
@@ -278,6 +277,10 @@ def     gngraph_ingest_file_api(filename, ftype, fdelim, nodename, bizdomain, gn
     ## Create Datanodes and edges
     gnIngestp.create_node_datanodes_edges()
 
+    
+
+
+    
 if __name__ == "__main__":
     
     filename="salesorder.csv"
