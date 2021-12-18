@@ -183,7 +183,7 @@ if  __name__ == "__main__":
         print('GnOps: start '+servname+' service ')
         GnServiceStart(servname)
     elif (cmd == "stop"):
-        if (servname != 'gnappsrv') or (servname != 'gnsearch'):
+        if (servname != 'gnappsrv') and (servname != 'gnsearch'):
             print('GnOps: Invalid service name allowed services: gnappsrv, gnsearch ')
             sys.exit(0)
         
