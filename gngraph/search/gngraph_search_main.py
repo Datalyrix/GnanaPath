@@ -1165,8 +1165,7 @@ def     test_metarepo_qry_fn():
     with open(efile, "w") as fp:
             json.dump(eJSON, fp)
 
-
-            
+    
             
 if __name__ == "__main__":
      
@@ -1175,3 +1174,4 @@ if __name__ == "__main__":
  #test_datarepo_qry_fn()
  #test_spkthread_fns(pparentDir)
  gnp_spark_app_server_socket(pparentDir)
+ print('Gngraph Search Thread exiting ')
