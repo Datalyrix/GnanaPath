@@ -24,9 +24,9 @@ The framework can be execute as part of docker containers
 
  After checking out repo. Go to the local repo directory
 
-cd GnanaPath
+\#cd GnanaPath
 
-Choose the appropriate Dockerfiler (pyspark or Jupyter Notebook)
+Choose the appropriate Dockerfile (pyspark or Jupyter Notebook)
 for pyspark-based container:
 
 \$ ln -s Dockerfile.pyspark Dockerfile
@@ -48,9 +48,24 @@ Login/passwd: gnadmin/gnana
 <h5> To clean up container </h5>
 sh ./gn_docker_cleanup.sh
 
+ <h4> Upload data </h4>
+ 
+ Currently, we support simple file upload using csv or json. we *donot* yet support nested json files.
+ 
+ - Click Upload on top menu options on GnanaPath UI
+ 
+ - Upload file from local file path
+ 
+ - After upload is complete, you will see upload success message
+ 
+ *note*  currently csv file header line (line 1) is treated as meta data header.
+ 
+ <h5> View the data in graph </h5>
+ 
+ Click  MetaView on top men option to view meta nodes created from file upload and SearchView to view data nodes.
+ 
 
-
-<h4> GNGraph Storage</h4>
+<h5> GNGraph Storage</h5>
 Currently gnanapath stores graphed data  as static files (static files mode)  and store it to a backend database (dbmode). Currently Postgres is supported as backend database.
 
 By default, the static files mode is always turned on.
@@ -60,19 +75,17 @@ To enable database mode, you will need to setup postgres database.
 Under Graph Config section, you can enable static file mode and db mode and also setup database configuration.
 
 
-
-
 <h5> Setting up Postgres container</h5>
 You can run postgres as container and connect with GNPath
 
 #docker pull postgres:alpine
 
-# Run postgres container
+- Run postgres container
 
 #docker run --name gnpgresdb -p 5432:5432 -e POSTGRES_USER=<PostgreUser> -e POSTGRES_PASSWORD=<PASSWORD> -d postgres:alpine
 
  
-#### Setup GNGraph DB on Postgres DB
+<h6>Setup GNGraph DB on Postgres DB</h6>
 
 Now login into GNPath UI
 
@@ -91,22 +104,7 @@ Under Database Name: You can create new Database for GNgraph or use existing dat
 
 ***Now you are ready to upload the data*****
 
- <h4> Upload data </h4>
- 
- Currently, we support simple file upload using csv or json. we *donot* yet support nested json files.
- 
- - Click Upload on top menu options on GnanaPath UI
- 
- - Upload file from local file path
- 
- - After upload is complete, you will see upload success message
- 
- *note*  currently csv file header line (line 1) is treated as meta data header.
- 
- <h4> View the data in graph </h4>
- 
- Click  MetaView on top men option to view meta nodes created from file upload and SearchView to view data nodes.
- 
+
  
  <h2> ToDo list </h2>
 
