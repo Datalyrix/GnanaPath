@@ -1,8 +1,11 @@
-
 from tinydb import TinyDB, Query, where
 import os
 import re
 from datetime import datetime
+"""
+   Upload Files log database: Main class to log uploaded files
+"""
+
 
 class FileLogSchemaModel:
 
@@ -108,8 +111,7 @@ def   gndd_filedb_insert_file_api(fname, fsize, ftype, bizdomain, fdesc, fdelim,
          return -1
      else:
          return 0
-     
-     
+          
 def  gndd_filedb_filelist_get(flogdbpath):
 
     fres = {};
