@@ -45,6 +45,8 @@ After that open browser http://<dockerhostip>:5050
 
 Login/passwd: gnadmin/gnana
 
+ ![Alt text](gnpath1.png?raw=true "Home")
+ 
 <h5> To clean up container </h5>
 sh ./gn_docker_cleanup.sh
 
