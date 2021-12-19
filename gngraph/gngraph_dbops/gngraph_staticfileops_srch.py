@@ -4,7 +4,7 @@ import pandas as pds
 import json
 import pathlib
 from pyspark.sql.functions import from_json, col
-from gnappsrv.gn_config import gn_log, gn_log_err
+from gnutils.gn_log import gn_log, gn_log_err
 
 """
 gngraph static fileops implementation for search (spark-based) 
