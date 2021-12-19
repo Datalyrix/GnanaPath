@@ -15,9 +15,8 @@ from moz_sql_parser import parse
 import os,sys
 curentDir = os.getcwd()
 parentDir = curentDir.rsplit('/', 1)[0]
-print(parentDir)
+
 rootDir = parentDir.rsplit('/', 1)[0]
-print(rootDir)
 if parentDir not in sys.path:
     sys.path.append(parentDir)
 if rootDir not in sys.path:
