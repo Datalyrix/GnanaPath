@@ -45,6 +45,8 @@ After that open browser http://<dockerhostip>:5050
 
 Login/passwd: gnadmin/gnana
 
+ ![Alt text](gnpath1.png?raw=true "Home")
+ 
 <h5> To clean up container </h5>
 sh ./gn_docker_cleanup.sh
 
@@ -64,6 +66,8 @@ sh ./gn_docker_cleanup.sh
  
  Click  MetaView on top men option to view meta nodes created from file upload and SearchView to view data nodes.
  
+  ![Alt text](gnpath2.png?raw=true "MetaView")
+  ![Alt text](gnpath3.png?raw=true "DataView")
 
 <h5> GNGraph Storage</h5>
 Currently gnanapath stores graphed data  as static files (static files mode)  and store it to a backend database (dbmode). Currently Postgres is supported as backend database.
