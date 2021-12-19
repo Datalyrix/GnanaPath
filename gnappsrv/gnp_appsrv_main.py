@@ -8,33 +8,6 @@ import os
 import sys
 import time
 import logging
-import pyspark
-from pyspark import SparkConf
-from pyspark.sql import SparkSession
-
-curentDir = os.getcwd()
-listDir = curentDir.rsplit('/', 1)[0]
-sys.path.append(listDir)
-###sys.path.append(listDir + '/gndatadis')
-#import findspark
-
-#findspark.init()
-
-from gndatadis.gndd_csv_load import gndwdbDataUpload  # to upload Files.
-from gnutils.get_config_file import get_config_neo4j_conninfo_file
-from gndwdb.gndwdb_neo4j_fetchops import gndwdb_metarepo_nodes_fetch_api, gndwdb_metarepo_edges_fetch_api
-from gnsearch.gnsrch_sql_srchops import gnsrch_sqlqry_api
-from gndwdb.gndwdb_neo4j_conn import gndwdb_neo4j_conn_check_api, gndwdb_neo4j_parse_config
-
-###from gngraph.ingest.gngraph_ingest_main import gngraph_init
-from gndatadis.gndd_filedb_ops import gndd_filedb_insert_file_api, gndd_filedb_filelist_get
-from gndatadis.gndd_filelist_table import GNFileLogResults
-from gngraph.search.gngraph_search_main import gngrph_search_init, gngrph_srch_metarepo_qry_fetch_api, gngrph_srch_metarepo_qry_fetch_nodes_api, gngrph_srch_datarepo_qry_fetch_api
-from gngraph.search.gngraph_search_client import gngrph_metaqry_request, gngrph_datarepo_qry_request, gngrph_metanodes_get_request
-
-from gngraph.gngraph_dbops.gngraph_pgresdbops import GNGraphPgresDBOps, GNGraphPgresDBMgmtOps
-from gngraph.ingest.gngraph_ingest_pd import gngraph_ingest_file_api
-
 import flask
 from flask import request, jsonify, request, redirect, render_template, flash, url_for, session, Markup, abort
 from werkzeug.utils import secure_filename
@@ -46,13 +19,39 @@ import json
 import re
 from connect_form import ConnectServerForm, LoginForm
 from collections import OrderedDict
-
-from gn_config import gn_config_init, gn_logging_init, gn_log, gn_log_err
-from gn_config import GNGraphConfigModel, GNGraphDBConfigModel, gn_pgresdb_getconfiguration
 from pathlib import Path
 import json
 import pathlib
-from pyspark.sql import SparkSession
+
+
+### Add root directory to path
+curentDir = os.getcwd()
+listDir = curentDir.rsplit('/', 1)[0]
+sys.path.append(listDir)
+
+from gnutils.gn_log import gn_log, gn_log_err
+from gn_config import gn_config_init, GNGraphConfigModel, GNGraphDBConfigModel, gn_pgresdb_getconfiguration
+
+##from gndatadis.gndd_csv_load import gndwdbDataUpload  # to upload Files.
+##from gnutils.get_config_file import get_config_neo4j_conninfo_file
+##from gndwdb.gndwdb_neo4j_fetchops import gndwdb_metarepo_nodes_fetch_api, gndwdb_metarepo_edges_fetch_api
+##from gnsearch.gnsrch_sql_srchops import gnsrch_sqlqry_api
+###from gndwdb.gndwdb_neo4j_conn import gndwdb_neo4j_conn_check_api, gndwdb_neo4j_parse_config
+
+###from gngraph.ingest.gngraph_ingest_main import gngraph_init
+from gndatadis.gndd_filedb_ops import gndd_filedb_insert_file_api, gndd_filedb_filelist_get
+
+###from gndatadis.gndd_filelist_table import GNFileLogResults
+
+##from gngraph.search.gngraph_search_main import gngrph_search_init, gngrph_srch_metarepo_qry_fetch_api, gngrph_srch_metarepo_qry_fetch_nodes_api, gngrph_srch_datarepo_qry_fetch_api
+
+from gngraph.search  import gngraph_search_client
+from gngraph.ingest.gngraph_ingest_pd import gngraph_ingest_file_api
+
+#from gngraph.search.gngraph_search_client import gngrph_metaqry_request, gngrph_datarepo_qry_request, gngrph_metanodes_get_request, gngraph_search_service_init
+
+###from gngraph.gngraph_dbops.gngraph_pgresdbops import GNGraphPgresDBOps, GNGraphPgresDBMgmtOps
+
 
 
 # Append system path
@@ -73,6 +72,7 @@ app.config["DEBUG"] = True
 
 app.secret_key = "f1eaff5ddef68e5025adef1db4cf7807"
 app.config['MAX_CONTENT_LENGTH'] = 256 * 1024 * 1024
+
 # app.config["JSONIFY_PRETTYPRINT_REGULAR"]=True
 # Get current path
 path = os.getcwd()
@@ -85,52 +85,22 @@ gn_config_init(app)
 
 # file Upload
 ###UPLOAD_FOLDER = os.path.join(path, 'uploads')
-UPLOAD_FOLDER = app.config["gnUploadsFolder"]
+##UPLOAD_FOLDER = app.config["gnUploadsFolder"]
 
 
 # Make directory if uploads is not exists
-if not os.path.isdir(UPLOAD_FOLDER):
-    os.mkdir(UPLOAD_FOLDER)
+##if not os.path.isdir(UPLOAD_FOLDER):
+##    os.mkdir(UPLOAD_FOLDER)
+
 
 gngraph_init_flag = 0
-gnp_spark = None
-gnsrch_ops = None
 # set this flag to 1 if we want to use spark thread 
 gnp_thread_flag=1
 
-def   __gn_graph_init():
-   global gngraph_init_flag
-   global gnp_spark
-   global gnsrch_ops
+
+
+
    
-   print('GnAppSrv: Initializing Spark Session '+str(gngraph_init_flag))
-   if (gngraph_init_flag == 1):
-       print('GnAppSrv: Graph is already initialized ')
-       return 
-   
-   app_name="gngraph_spk"
-   gn_log('GnAppSrv: Initializing Spark Session ' )
-
-   conf = SparkConf()
-   conf.set('spark.executor.memory', '4g')
-   conf.set('spark.driver.memory', '4g')
-
-   gnp_spark = SparkSession \
-           .builder \
-           .appName("gnp") \
-           .config("spark.some.config.option", "some-value") \
-           .getOrCreate()
-
-   gn_log('GnAppSrv: Spark session acquired ')
-   #sc = pyspark.SparkContext(appName=app_name)
-   gnp_spark.sparkContext.setLogLevel("INFO")
-   
-   ### Initialize GNGraph Sessions
-   print('GnAppSrv: Initializing Search Ops ')
-   gnsrch_ops = gngrph_search_init(gnp_spark,   app.config["gnDataFolder"],  app.config["gnGraphDBCredsFolder"],  app.config["gnCfgSettings"])
-   gngraph_init_flag = 1
-   print('GnAppSrv: gngraph Init COMPLETE SUCCESS '+str(gngraph_init_flag))
-
 # Allowed extension you can set your own
 ALLOWED_EXTENSIONS = set(['csv', 'json', ])
 
@@ -528,9 +498,10 @@ def  testdb_conn():
 @app.route('/api/v1/search', methods=['GET'])
 @login_required
 def gnsrch_api():
-    verbose = 0
+
     srchqry = ''
-    gn_log('gn search api initiated')
+    gn_log('GnAppSrv: request for datanodes searching received')
+    
     # Get srchstring and then pass to search func
     if 'srchqry' in request.args:
         srchqry = request.args['srchqry']
@@ -538,40 +509,28 @@ def gnsrch_api():
         if 'lnodes' in request.args:
             lnodes = request.args['lnodes']
         else:
-            lnodes = 1000
+            lnodes = 10
 
         if 'nodemode' in request.args:
             nodemode = int(request.args['nodemode'])
         else:
             nodemode = 1
-            
-        gn_log('GNSearch: search qry string:' + srchqry)
-        
+                    
         # Remove "' begining and end
         srchqry_filtered = dequote(srchqry)
         slen = len(srchqry_filtered)
 
-        # Let us invoke gnsrch api
-        gn_log('GNPAppServer: search qry : ' + srchqry_filtered)
+        gn_log('GnAppSrv: searching datanode with qry : ' + srchqry_filtered)
 
-        nodesonly = 1
         ##Nodemode: 1 Nodes only, 2 Nodes+Edges, 3 Nodes+Edges+Derived nodes
-        if (gnp_thread_flag == 1):
-            res = gngrph_datarepo_qry_request(srchqry_filtered, nodemode, lnodes)
-        else:
-            res = gngrph_srch_datarepo_qry_fetch_api(gnsrch_ops, gnp_spark, srchqry_filtered, nodesonly)
+        res = gngraph_search_client.gnsrch_dataqry_request(srchqry_filtered, nodemode, lnodes)
         
-        ###res_data = re.sub(r"(\w+):", r'"\1":', res)
-        gn_log('GNPAppServer: Fetch Data Nodes with filter '+srchqry_filtered+' SUCCESS')
-        gn_log('GNPAppServer: Fetch Data Nodes with filter '+srchqry_filtered+' SUCCESS')
-        ##print(res)
-        ##res = {}
-        ##res_data = re.sub(r"(\w+):", r'"\1":', res)
+        gn_log('GnAppSrv: fetched datanodes with filter '+srchqry_filtered+' SUCCESS')
 
         rjson = {
             "status": "SUCCESS",
             "gndata": res
-        }
+        }        
         return rjson
 
     else:
@@ -579,8 +538,7 @@ def gnsrch_api():
             'status': 'ERROR',
             'errmsg': "No Search query provided "
         }
-        # return jsonify('{status:"ERROR", errmsg:"No Search query provided
-        # "}');
+
         return jsonify(errstr)
 
 
@@ -596,8 +554,7 @@ def gnmetaview_cola_api():
 @login_required
 def gnmetanodes_fetch_api():
 
-    verbose = 0
-    print('GNPAppserver: Meta nodes search api ')
+    gn_log('GnAppSrv:  request received for meta nodes search')
     # Get srchstring and then pass to search func
     if 'srchqry' in request.args:
         srchqry_raw = request.args['srchqry']
@@ -605,22 +562,15 @@ def gnmetanodes_fetch_api():
         # Remove "' begining and end
         srchqry = dequote(srchqry_raw)
 
-        # Let us invoke gnsrch api
-        gnlogger.info('GNPAppServer: search qry for metanodes : ' + srchqry)
+        gn_log('GnAppSrv: search qry for metanodes : ' + srchqry)
     else:
         srchqry = ''
 
-    # call gnmeta node search api Right now ignore searchqry arg
 
-    ##res = gndwdb_metarepo_nodes_fetch_api(verbose)
     srchfilter=""
-    if (gnp_thread_flag == 1):
-       ##res = gngrph_metaqry_request(srchfilter)
-       res = gngrph_metanodes_get_request()
-    else:    
-       res = gngrph_srch_metarepo_qry_fetch_nodes_api(gnsrch_ops, gnp_spark, srchfilter) 
-    ###res_data = re.sub(r"(\w+):", r'"\1":', res)
-    gn_log('GNPAppServer:  metanode search  with filter '+srchfilter+'  SUCCESS : ')
+    res = gngraph_search_client.gnsrch_metanodes_request()
+
+    gn_log('GnAppSrv:  metanode search  with filter '+srchfilter+'  SUCCESS : ')
     if (res["status"] == "SUCCESS"):
         rjson = {
            "status": "SUCCESS",
@@ -632,20 +582,15 @@ def gnmetanodes_fetch_api():
             "status": "ERROR",
             "gndata": res["data"]
             }
-        
-      
-
-    # return json.JSONDecoder(object_pairs_hook=OrderedDict).decode()
+              
     return rjson
 
-    # return  json.dumps(rjson, indent=4, separators=(',', ': '))
 
 
 @app.route('/api/v1/metaedges', methods=['GET'])
 @login_required
 def gnmetaedges_fetch_api():
 
-    verbose = 0
     # Get srchstring and then pass to search func
     if 'srchqry' in request.args:
         srchqry_raw = request.args['srchqry']
@@ -659,24 +604,17 @@ def gnmetaedges_fetch_api():
     else:
         srchqry = ''
 
-    # call gnmeta node search api Right now ignore searchqry arg
-
-    ##res = gndwdb_metarepo_edges_fetch_api(srchqry, verbose)
     srchfilter=""
-    if (gnp_thread_flag == 1):
-        res = gngrph_metaqry_request(srchfilter)
-    else:
-        res = gngrph_srch_metarepo_qry_fetch_api(gnsrch_ops, gnp_spark, srchfilter)
+    res = gngraph_search_client.gnsrch_metaqry_request(srchfilter)
     
     ##res_data = re.sub(r"(\w+):", r'"\1":', res)
-    gn_log('GNPAppServer: metanodes and edges with filter '+srchfilter+' SUCCESS ')
+    gn_log('GnAppSrv: metanodes and edges with filter '+srchfilter+' SUCCESS ')
     
     rjson = {
         "status": "SUCCESS",
         "gndata": res
     }
 
-    # return json.JSONDecoder(object_pairs_hook=OrderedDict).decode()
     return rjson
 
 @app.route('/gnlog')
@@ -691,8 +629,12 @@ def gn_log_stream():
     return app.response_class(generate(), mimetype='text/plain')
 
 if __name__ == '__main__':
-    print(' Running Flask App ')
+    
+    gn_log('GnAppSrv: Starting GnSearch thread ')
+    gngraph_search_client.__gn_graph_init(gnp_thread_flag, app.config["gnRootDir"])    
+    
+    gn_log('GnAppSrv: Running Flask App ')
     if (gnp_thread_flag == 0):
         __gn_graph_init()
     app.run(host='0.0.0.0', port=5050, debug=True)
-    print(' Started Flask App ')
+    gn_log('GnAppSrv:  Started Flask App ')

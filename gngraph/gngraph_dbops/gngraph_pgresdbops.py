@@ -4,7 +4,7 @@ import json
 import pandas as pds
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT # Need for CREATE DATABASE
 from psycopg2 import sql
-from gnappsrv.gn_config import gn_log
+from gnutils.gn_log import gn_log, gn_log_err
 
 """
 gngraph db implementation main class and associated functions

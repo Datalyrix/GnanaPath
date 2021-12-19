@@ -23,7 +23,6 @@ from pyspark.sql.types import *
 from pyspark.sql.functions import col,from_json
 
 
-import os,sys
 curentDir = os.getcwd()
 parentDir = curentDir.rsplit('/', 1)[0]
 if parentDir not in sys.path:
@@ -33,13 +32,12 @@ pparentDir = parentDir.rsplit('/', 1)[0]
 if pparentDir not in sys.path:
     sys.path.append(pparentDir)
 
-print(' Parent Dir ' + pparentDir)
 
 from gngraph.config.gngraph_config import GNGraphConfig
 from gngraph.gngraph_dbops.gngraph_pgresdbops_srch import GNGraphSrchPgresDBOps
 from gngraph.gngraph_dbops.gngraph_staticfileops_srch import GNGraphSrchStaticFileOps
 from gngraph.search.gngraph_sqlparser import GNGraphSqlParserOps
-from gnappsrv.gn_config import gn_log, gn_log_err
+from gnutils.gn_log import gn_log, gn_log_err
 
 
 class     GNGraphSearchOps:
@@ -1169,7 +1167,7 @@ def     test_metarepo_qry_fn():
             
 if __name__ == "__main__":
      
- print(' Parent Dir ' + pparentDir)
+ #print(' Parent Dir ' + pparentDir)
  #test_metarepo_qry_fn()
  #test_datarepo_qry_fn()
  #test_spkthread_fns(pparentDir)

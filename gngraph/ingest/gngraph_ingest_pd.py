@@ -1,13 +1,14 @@
-# Example python program to read data from a PostgreSQL table
-# and load into a pandas DataFrame
-
+import os
+import sys
 import psycopg2
 import pandas as pds
 import json
 from sqlalchemy import create_engine
+"""
+    GnGraph Ingest Ops for batch files using pd frames
 
+"""
 
-import os,sys
 curentDir = os.getcwd()
 parentDir = curentDir.rsplit('/', 1)[0]
 if parentDir not in sys.path:
@@ -16,7 +17,7 @@ if parentDir not in sys.path:
 from gngraph.config.gngraph_config import GNGraphConfig
 from gngraph.gngraph_dbops.gngraph_pgresdbops import GNGraphPgresDBOps
 from gngraph.gngraph_dbops.gngraph_staticfileops import GNGraphStaticFileOps
-from gnappsrv.gn_config import gn_log, gn_log_err
+from gnutils.gn_log import gn_log, gn_log_err
 
 
 class     GNGraphIngestOps:
