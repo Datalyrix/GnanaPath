@@ -7,9 +7,9 @@ import logging
 ##import subprocess
 
 curentDir = os.getcwd()
-gnRootDir = curentDir.rsplit('/', 1)[0]
-if gnRootDir not in sys.path:
-    sys.path.append(gnRootDir)
+GnRootDir = curentDir.rsplit('/', 1)[0]
+if GnRootDir not in sys.path:
+    sys.path.append(GnRootDir)
     
 GNSRCH_APP="gngraph_search_main.py"
 GNAPP_SRV="gnp_appsrv_main.py"
@@ -47,7 +47,8 @@ def   checkIfProcessRunning(processName):
     #        pass
     return pid;
 
-def    GnCheckServices():
+
+def      GnCheckServices(gnRootDir):
     # Check if any chrome process was running or not.
     
     srchpid = checkIfProcessRunning(GNSRCH_APP)
@@ -62,15 +63,16 @@ def    GnCheckServices():
         print('App Service is not running ')
     else:
         print('App Service is running with pid '+str(appsrvpid))
+        
+    return(appsrvpid, srchpid)
 
-
-def     GnServiceStart(servname):
+def     GnServiceStart(gnRootDir, servname):
 
     if (servname == "gnsearch"):
         srchpid = checkIfProcessRunning(GNSRCH_APP)
         if (srchpid != 0):
             print('GnSearch service is already running')
-            return 0
+            return srchpid
         else:
             cm = gnRootDir+"/gngraph/search/startGNSearch.sh "+gnRootDir
             #rc = subprocess.call(cm)
@@ -82,7 +84,8 @@ def     GnServiceStart(servname):
                 print('GnSearch service is started succesfully ')
             else:
                 print('GnSearch service failed to start ')
-
+                return -1
+                
     if (servname == "gnappsrv"):
         srvpid = checkIfProcessRunning(GNAPP_SRV)
         if (srvpid != 0):
@@ -102,7 +105,7 @@ def     GnServiceStart(servname):
    
                 
         
-def     GnServiceStop(servname):
+def     GnServiceStop(gnRootDir, servname):
 
     logFile=gnRootDir+"/gnlog/gnops.log"
     if (servname == "gnsearch"):
@@ -151,7 +154,7 @@ def     GnServiceStop(servname):
                 
 if  __name__ == "__main__":
     
-    #print(' Root Director '+gnRootDir)
+    print(' Root Director '+GnRootDir)
     ##parser = argparse.ArgumentParser()
     nargs = len(sys.argv)
     #print('sys argc '+str(nargs))
@@ -175,19 +178,19 @@ if  __name__ == "__main__":
     
     if (cmd == "check"):
         print('GnOps: checking for services')
-        GnCheckServices()
+        (appsrvpid, srchpid) = GnCheckServices(GnRootDir)
     elif (cmd == "start"):    
         if (servname != 'gnappsrv') and (servname != 'gnsearch'):
             print('GnOps: Invalid service name allowed services: gnappsrv, gnsearch ')
             sys.exit(0)
         print('GnOps: start '+servname+' service ')
-        GnServiceStart(servname)
+        GnServiceStart(GnRootDir, servname)
     elif (cmd == "stop"):
         if (servname != 'gnappsrv') and (servname != 'gnsearch'):
             print('GnOps: Invalid service name allowed services: gnappsrv, gnsearch ')
             sys.exit(0)
         
         print('GnOps: stop '+servname+' service ')
-        GnServiceStop(servname)
+        GnServiceStop(GnRootDir, servname)
     else:
         print('GnOps: Invalid command string: allowed cmds:check, start, stop ')
