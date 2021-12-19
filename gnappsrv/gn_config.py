@@ -1,5 +1,5 @@
 import os
-import logging
+import sys
 from tinydb import TinyDB, Query, where
 from tinydb.table import Document
 
@@ -10,7 +10,11 @@ GNGrapConfigModel: file creds/gngraph/gngraph_config_settings.json
 GNGraphDBConfigModel: file creds/gngraph/gngraph_pgres_dbcreds.json
 
 """
+curentDir = os.getcwd()
+listDir = curentDir.rsplit('/', 1)[0]
+sys.path.append(listDir)
 
+from gnutils.gn_log import gn_log, gn_log_err
 
 class GNGraphDBConfigModel:
 
@@ -141,7 +145,8 @@ gn_config_init: Main init config routine
 """
 
 def        gn_config_init(app):
-    print('GnConfig: Initializing Config directories ')
+    
+    gn_log('GnCfg: Initializing Config directories ')
     app.config["gnDataFolder"] = app.config["gnRootDir"]+"/gndata"
     app.config["gnDBFolder"] = app.config["gnRootDir"]+"/gndb"
     app.config["gnCfgDBFolder"] = app.config["gnRootDir"]+"/gnconfigdb"
@@ -153,20 +158,20 @@ def        gn_config_init(app):
     
     if not os.path.isdir(app.config["gnDataFolder"]):
         os.mkdir(app.config["gnDataFolder"])
-        print(app.config["gnDataFolder"]+" is created")
+        gn_log('GnCfg: '+app.config["gnDataFolder"]+" is created")
     if not os.path.isdir(app.config["gnUploadsFolder"]):
         os.mkdir(app.config["gnUploadsFolder"])
-        print(app.config["gnUploadsFolder"]+" is created")
+        gn_log('GnCfg: '+app.config["gnUploadsFolder"]+" is created")
 
     if not os.path.isdir(app.config["gnCfgDBFolder"]):
         os.mkdir(app.config["gnCfgDBFolder"])
-        print(app.config["gnCfgDBFolder"]+" is created")    
+        gn_log('GnCfg: '+app.config["gnCfgDBFolder"]+" is created")    
     if not os.path.isdir(app.config["gnDiscoveryFolder"]):
         os.mkdir(app.config["gnDiscoveryFolder"])
-        print(app.config["gnDiscoveryFolder"]+" is created ")
+        gn_log('GnCfg: '+app.config["gnDiscoveryFolder"]+" is created ")
     if not os.path.isdir(app.config["gnProfileFolder"]):
         os.mkdir(app.config["gnProfileFolder"])
-        print(app.config["gnProfileFolder"]+" is created")
+        gn_log('GnCfg: '+app.config["gnProfileFolder"]+" is created")
     if not os.path.isdir(app.config["gnGraphFolder"]):
         os.mkdir(app.config["gnGraphFolder"])
         
@@ -177,7 +182,7 @@ def        gn_config_init(app):
         os.mkdir(cfg_dir)
     if not os.path.isdir(data_dir):
         os.mkdir(data_dir)
-    gn_log(app.config["gnGraphFolder"]+" and subdirs are created")    
+    gn_log('GnCfg: '+app.config["gnGraphFolder"]+" and subdirs are created")    
           
     app.config["gnLogDir"] = app.config["gnRootDir"]+"/gnlog"
     app.config["gnLogFile"] = "gnpath.log"
@@ -200,33 +205,5 @@ def   gn_pgresdb_getconfiguration(credfpath):
     gn_log('GnDBCfg: getting postgres config ')
     gndb_cfg_settings = gndb_cfg.get_op()
     return gndb_cfg_settings
-def     gn_logging_init(logname):
-
-    print("GnLog: Initializing Logging ")
-    path = os.getcwd()
-    gnRootDir = path.rsplit('/', 1)[0]
-    gnLogDir = gnRootDir+"/gnlog"
-
-    if not os.path.isdir(gnLogDir):
-        os.mkdir(gnLogDir)
-
-    gnLogFile = "gnpath.log"
-    logfilepath = gnLogDir+"/"+gnLogFile     
-    logging.basicConfig(filename=logfilepath, filemode='a', \
-                        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',\
-                        level=logging.INFO)
-    logger = logging.getLogger(logname)
-    return logger
-
-
-gnlogger = gn_logging_init("GNPath")
-
-
-def    gn_log(msg):
-    gnlogger.info(msg)
-
-
-def    gn_log_err(msg):
-    gnlogger.error(msg)
 
 
