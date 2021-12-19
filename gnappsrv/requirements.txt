@@ -8,6 +8,7 @@ neo4j
 numexpr
 numpy
 pandas
+psutil
 pyyaml
 sqlparse
 sqlalchemy
