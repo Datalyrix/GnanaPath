@@ -36,7 +36,6 @@ class GNGraphDBConfigModel:
 
     def search_res(self, id):
         return self._db.get(doc_id=id)
-
     
     def insert_op(self, req_dict):
         if not self.search_op(req_dict):
@@ -179,7 +178,6 @@ def        gn_config_init(app):
     if not os.path.isdir(data_dir):
         os.mkdir(data_dir)
     gn_log(app.config["gnGraphFolder"]+" and subdirs are created")    
-        
           
     app.config["gnLogDir"] = app.config["gnRootDir"]+"/gnlog"
     app.config["gnLogFile"] = "gnpath.log"
@@ -196,8 +194,12 @@ def        gn_config_init(app):
     app.config["gnCfgSettings"] = gncfg_settings
                                     
     
+def   gn_pgresdb_getconfiguration(credfpath):
     
-        
+    gndb_cfg = GNGraphDBConfigModel(credfpath)
+    gn_log('GnDBCfg: getting postgres config ')
+    gndb_cfg_settings = gndb_cfg.get_op()
+    return gndb_cfg_settings
 def     gn_logging_init(logname):
 
     print("GnLog: Initializing Logging ")

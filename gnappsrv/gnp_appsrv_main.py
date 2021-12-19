@@ -48,7 +48,7 @@ from connect_form import ConnectServerForm, LoginForm
 from collections import OrderedDict
 
 from gn_config import gn_config_init, gn_logging_init, gn_log, gn_log_err
-from gn_config import GNGraphConfigModel, GNGraphDBConfigModel
+from gn_config import GNGraphConfigModel, GNGraphDBConfigModel, gn_pgresdb_getconfiguration
 from pathlib import Path
 import json
 import pathlib
@@ -144,38 +144,6 @@ all_users = {"gnadmin": usr}
 def allowed_file(filename):
     return '.' in filename and filename.rsplit(
         '.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
-
-###### Supported functions need to move
-def    gn_pgresdb_testconnection(dbcredpath, dbname):
-
-    pgres_c = GNGraphDBConfigModel(dbcredpath)
-    pgres_conf = pgres_c.get_op()
-    
-    if ((pgres_conf['serverIP'] == '') or (pgres_conf['serverPort'] == '') or (pgres_conf['username'] == '') or (pgres_conf['password'] == '')):
-        connection_status = "NotConfigured"
-        return connection_status
-
-    pgdb_cls = GNGraphPgresDBOps(pgres_conf['serverIP'], pgres_conf['serverPort'], pgres_conf['username'], pgres_conf['password'], dbname, "")
-    is_connect = pgdb_cls._isconnected()
-
-    if (is_connect == 1):
-        connection_status = "Connected"
-    else:
-        connection_status = "NotConnected"
-
-    return connection_status
-
-def       gn_pgresdb_getconfiguration(dbcredpath):
-
-    pgres_c = GNGraphDBConfigModel(dbcredpath)
-    pgres_conf = pgres_c.get_op()
-    pgres_connection_status = gn_pgresdb_testconnection(dbcredpath, "postgres")
-
-    pgres_conf["connectionStatus"] = pgres_connection_status
-    return pgres_conf
-
-
 
 
 @login_manager.user_loader
@@ -314,6 +282,8 @@ def  gdb_config_settings_page():
             print('GNGraphDB: sfmode '+in_vars['sfmode'])
             if (in_vars['dbmode'] == 'on'):
                 cfg_setting['dbmode'] = 1
+                ## dbmode is turned on
+                #gngraph_datacopy_sf_to_pgres()
             else:
                 cfg_setting['dbmode'] = 0
 
