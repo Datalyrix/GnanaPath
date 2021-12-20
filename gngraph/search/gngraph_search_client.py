@@ -123,6 +123,28 @@ def      gngrph_metanodes_get_request():
     print(rJData)
     return rJData
 
+
+def      gngrph_meta_remap_request():
+    
+    tskcmd="metaremap"
+    #print(' task cmd ')
+    #print(tskcmd)
+    srchfilter = ""
+    nodemode = 2
+    t = {}
+    t["cmd"] = "metaremap"
+    t["args"] = ""
+    t["nodemode"] = nodemode
+
+    resp = gngrph_search_client_sendreq(t)
+    
+    rJData = json.loads(resp)
+    rdata = rJData["data"]
+  
+    gn_log('GnSrchOps:  metarepo remap request response ')
+    gn_log(rJData)
+    return rJData 
+ 
 def      gngrph_metaqry_request(srchfilter):
     
     tskcmd="metasearch"
@@ -211,6 +233,12 @@ def     gnsrch_metanodes_request():
        res = gngraph_search_main.gngrph_srch_metarepo_qry_fetch_nodes_api(gnsrch_ops, gnp_spark, srchfilter)
    return res
 
+def    gnsrch_meta_remap_request():
+
+    if (gnsrch_thread_flag == 1):
+        res = gngrph_meta_remap_request()
+        return res    
+    
 
 def    gnsrch_dataqry_request(srchfilter, nodemode, lnodes):
 
