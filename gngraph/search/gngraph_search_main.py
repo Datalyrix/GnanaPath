@@ -21,23 +21,29 @@ from pyspark.sql.functions import lit,split
 from pyspark.sql import Row
 from pyspark.sql.types import *
 from pyspark.sql.functions import col,from_json
-
+from pyspark.sql.utils import AnalysisException
 
 curentDir = os.getcwd()
 parentDir = curentDir.rsplit('/', 1)[0]
 if parentDir not in sys.path:
     sys.path.append(parentDir)
 
-pparentDir = parentDir.rsplit('/', 1)[0]
-if pparentDir not in sys.path:
-    sys.path.append(pparentDir)
+gnRootDir = parentDir.rsplit('/', 1)[0]
+if gnRootDir not in sys.path:
+    sys.path.append(gnRootDir)
 
 
 from gngraph.config.gngraph_config import GNGraphConfig
 from gngraph.gngraph_dbops.gngraph_pgresdbops_srch import GNGraphSrchPgresDBOps
 from gngraph.gngraph_dbops.gngraph_staticfileops_srch import GNGraphSrchStaticFileOps
 from gngraph.search.gngraph_sqlparser import GNGraphSqlParserOps
-from gnutils.gn_log import gn_log, gn_log_err
+from gnutils.gn_srch_log import gnsrch_log, gnsrch_log_err, gnsrch_logging_init
+
+"""
+ Enable search related logs 
+"""
+gnsrch_logging_init("GnSrchOps", gnRootDir)
+
 
 
 class     GNGraphSearchOps:
@@ -67,17 +73,17 @@ class     GNGraphSearchOps:
         self.__init_data = 0
         self.__init_meta = 0
         self.__gngrp_dnDFList = []
-        self.__gnmetaNodeDF = None
-        self.__gnmetaEdgeDF = None
-        self.__gnmeaNodeDF = None
+        ##self.__gnmetaNodeDF = None
+        ##self.__gnmetaEdgeDF = None
+  
         self.__gnmetaNodesDF_cached = None
         self.__gnmetaEdgesDF_cached = None
         self.__gnmetaDerivedNodesDF_cached = None
         self.__gnmetaNodesList = []
-        
+        gnsrch_log('GnSrchOps: ########### SearchOps Init ##############')
         self.gngraph_config_init(gngrp_datadir, accessmode, fargs, dbargs)
         self.gngraph_meta_nodes_edges_setup()
-        print("GnSrchOps:  Search Initialization complete SUCCESS ")
+        gnsrch_log("GnSrchOps:  ####Search Initialization complete SUCCESS #### ")
 
         
     def     srch_init_data_status(self):
@@ -213,17 +219,17 @@ class     GNGraphSearchOps:
     def    get_metaedges_mapped_df(self):
 
         if (self.__gncfg_accessmode["dbmode"] == 1):
-            self.__gnmetaEdgeDF = self.__gngrp_dbops.gnmetaedges_map_df(self.__spark)             
+            self.__gnmetaEdgesDF_cached = self.__gngrp_dbops.gnmetaedges_map_df(self.__spark)             
         elif (self.__gncfg_accessmode["sfmode"] == 1):
-            self.__gnmetaEdgeDF = self.__gngrp_sfops.gnmetaedges_map_df(self.__spark)
+            self.__gnmetaEdgesDF_cached = self.__gngrp_sfops.gnmetaedges_map_df(self.__spark)
         else:
-            self.__gnmetaEdgeDF = None
+            self.__gnmetaEdgesDF_cached = None
 
-        if (self.__gnmetaEdgeDF is None):
-            gn_log('GNGrphSrchOps: metaEdgeDF is none')
+        if (self.__gnmetaEdgesDF_cached is None):
+            gnsrch_log('GNGrphSrchOps: metaEdgeDF is not mapped ')
             self.__init_meta = 0
         else:
-            gn_log('GNGrphSrchOps: metaEdgeDF is mapped')
+            gnsrch_log('GNGrphSrchOps: metaEdgeDF is mapped ')
             self.__init_meta = 1
 
         return
@@ -233,17 +239,17 @@ class     GNGraphSearchOps:
     def    get_metanodes_mapped_df(self):
 
         if (self.__gncfg_accessmode["dbmode"] == 1):
-             self.__gnmetaNodeDF= self.__gngrp_dbops.gnmetanodes_map_df(self.__spark)             
+             self.__gnmetaNodesDF_cached = self.__gngrp_dbops.gnmetanodes_map_df(self.__spark)             
         elif (self.__gncfg_accessmode["sfmode"] == 1):
-             self.__gnmetaNodeDF = self.__gngrp_sfops.gnmetanodes_map_df(self.__spark)
+             self.__gnmetaNodesDF_cached = self.__gngrp_sfops.gnmetanodes_map_df(self.__spark)
         else:
-            self.__gnmetaNodeDF = None
+            self.__gnmetaNodesDF_cached = None
 
-        if (self.__gnmetaNodeDF is None):
-            gn_log("GNGrphSrchOps: metaNodesDF is none")
+        if (self.__gnmetaNodesDF_cached is None):
+            gnsrch_log("GNGrphSrchOps: metaNodesDF is not mapped")
             self.__init_meta = 0
         else:
-            gn_log("GNGrphSrchOps: metaNodesDF is mapped")
+            gnsrch_log("GNGrphSrchOps: metaNodesDF is mapped")
             self.__init_meta = 1
         return
 
@@ -252,11 +258,17 @@ class     GNGraphSearchOps:
     """
 
     def      map_gnmeta_nodes_edges(self):
-        
-        print('GnSrchOps: Map and cache gnmeta nodes and edges ')
+
+        self.__gnmetaNodesList = []
+        gnsrch_log('GnSrchOps: Map and cache gnmeta nodes and edges ')
         sqlst = "select * from gnmetanodes WHERE gnnodetype='GNMetaNode' OR gnnodetype='GNMetaNodeAttr'"
 
-        (resNodesDF, nJson) = self.gngraph_execute_sqlqry(sqlst)
+        (resNodesDF, nJson, status) = self.gngraph_execute_sqlqry(sqlst)
+
+        if (status == "ERROR"):
+             gnsrch_log('GnSrchOps: mapping metanodes and edges failed due query failure ')
+             return (self.__gnmetaNodesList)
+        
         self.__gnmetaNodesDF_cached = resNodesDF
         
         (eDF, dnDF) = self.gngraph_metarepo_qry_getedges(self.__gnmetaNodesDF_cached, sqlst, 0)
@@ -275,8 +287,19 @@ class     GNGraphSearchOps:
 
         
         self.__gnmetaNodesList = n1DF.toJSON().collect()
-        print('GnSrchOps: MetaNodes List ')
-        print(self.__gnmetaNodesList)
+        gnsrch_log('GnSrchOps: MetaNodes List ')
+        gnsrch_log(self.__gnmetaNodesList)
+
+    def      gngrph_metarepo_remap(self, nodemode):
+
+        gnsrch_log('GnSrchOps: Remapping meta nodes and edges '+str(nodemode))
+        #if (nodemode == 2):
+        self.__gnmetaNodesDF_cached = None
+        self.__gnmetaNodesDF_cached = None
+        self.__gnmetaDerivedNodesDF_cached = None
+        
+        self.gngraph_meta_nodes_edges_setup()    
+        gnsrch_log('GnSrchOps: Remapping meta nodes and edges completed ')
 
     def      gngrph_metarepo_nodes_get(self):
         rJ = {}
@@ -289,7 +312,7 @@ class     GNGraphSearchOps:
     
     def      gngrph_metarepo_get(self):
 
-        print('GnSrchOps: getting metarepo information ')
+        gnsrch_log('GnSrchOps: getting metarepo information ')
         if ((self.__gnmetaNodesDF_cached is None) and (self.__gnmetaEdgesDF_cached is None)):
             #map gnnodes and edges
             self.map_gnmeta_nodes_edges()
@@ -331,7 +354,7 @@ class     GNGraphSearchOps:
     def      gngraph_search_setup(self, sqlst, lnodes):
 
         gn_srch_sql = sqlst  
-        print("GnSrchOps: Parsing sql st "+gn_srch_sql)  
+        gnsrch_log("GnSrchOps: Parsing sql st "+gn_srch_sql)  
         gn_ssql_parsed = GNGraphSqlParserOps(gn_srch_sql)
         
         #self.__entlist
@@ -341,8 +364,8 @@ class     GNGraphSearchOps:
             if x not in self.__entlist:
                aEntList.append(x)
                
-        print('GnSrchOps: search setup data entities list parsed ')
-        print(aEntList)
+        gnsrch_log('GnSrchOps: search setup data entities list parsed ')
+        gnsrch_log(aEntList)
         
         gn_ssql_parsed_where_str = gn_ssql_parsed.get_where_str()
         ###self.__gngrp_dnDFList = []
@@ -350,26 +373,26 @@ class     GNGraphSearchOps:
         for ent in aEntList:            
             entD = {}                            
             ent_metanode_info =  self.get_metanode_info(ent)
-            print('GnSrchOps: got metanode info for '+ent+' ')
-            print(ent_metanode_info)
+            gnsrch_log('GnSrchOps: got metanode info for '+ent+' ')
+            gnsrch_log(ent_metanode_info)
             if (len(ent_metanode_info) == 0):
-                print('GnSrchOps: node '+ent+' does not exist ')
+                gnsrch_log('GnSrchOps: node '+ent+' does not exist ')
                 errmsg = f"  node "+ent+" does not exist "
                 return (-1, errmsg)
             ##jprop = json.loads(ent_metanode_info["gnnodeprop"])
             node_name = ent_metanode_info["gnnodename"]
             bizdomain = ent_metanode_info["bizdomain"]
 
-            print("GnSrchOps:  setup api nodename "+node_name+" bizdomain:"+bizdomain)
+            gnsrch_log("GnSrchOps:  setup api nodename "+node_name+" bizdomain:"+bizdomain)
             entnodeDF = self.get_datanode_mapped_df(node_name, bizdomain)
 
             if (entnodeDF is not None):
                ent_metanode_info["df"] = entnodeDF
                self.__gngrp_dnDFList.append(ent_metanode_info)
                self.__entlist.append(ent)
-               print('GnSrchOps: node entity '+node_name+' is mapped ')
+               gnsrch_log('GnSrchOps: node entity '+node_name+' is mapped ')
             else:
-               print("GnSrchOps: NodeDF setup "+node_name+" nodeDF is empty ")
+               gnsrch_log("GnSrchOps: NodeDF setup "+node_name+" nodeDF is empty ")
 
         self.__sql_formatted = sqlst
         limit_rec = gn_ssql_parsed.get_limit_records()
@@ -390,15 +413,22 @@ class     GNGraphSearchOps:
         
     
     def     gngraph_execute_sqlqry(self, sqlst):
-        
-        resDF = self.__spark.sql(sqlst)
-        ##resDF.show(10)
-        ###print(resDF.count())
+        try:        
+            resDF = self.__spark.sql(sqlst)
+            ##resDF.show(10)
+            ###print(resDF.count())
 
-        resJson = {}
-        print('GnSrchOps: executed sql and result: ')
+            resJson = {}
+            status = "SUCCESS"
+            gnsrch_log('GnSrchOps: executed sql :'+sqlst)
+        except (AnalysisException, Exception) as err:
+            gnsrch_log('GnSrchOps: ran into Exception:'+str(err))
+            resDF = None
+            resJson= {}
+            status = "ERROR"
+          
         ##print(resJson)
-        return (resDF, resJson)
+        return (resDF, resJson, status)
 
     
      
@@ -410,23 +440,23 @@ class     GNGraphSearchOps:
     def    gngraph_metarepo_qry_getedges(self, rnodeDF, sqlst, derived_nodes_flag):
 
         # first map gnedges
-        print('GnSrchOps:metanodes  querying for edges and derived nodes flag '+str(derived_nodes_flag))
+        gnsrch_log('GnSrchOps:metanodes  querying for edges and derived nodes flag '+str(derived_nodes_flag))
         self.get_metaedges_mapped_df()
         self.get_metanodes_mapped_df()
-        print('GnSrchOps: Enumerating edges and nodes on join ')
-        self.__gnmetaEdgeDF.show(4)
+        gnsrch_log('GnSrchOps: Enumerating edges and nodes on join ')
+        self.__gnmetaEdgesDF_cached.show(4)
         rnodeDF.show(4)
          
-        cond=[((self.__gnmetaEdgeDF.gntgtnodeid == rnodeDF.gnnodeid) | (self.__gnmetaEdgeDF.gnsrcnodeid == rnodeDF.gnnodeid)) & (self.__gnmetaEdgeDF.gnedgetype == 'GNMetaNodeEdge')]
+        cond=[((self.__gnmetaEdgesDF_cached.gntgtnodeid == rnodeDF.gnnodeid) | (self.__gnmetaEdgesDF_cached.gnsrcnodeid == rnodeDF.gnnodeid)) & (self.__gnmetaEdgesDF_cached.gnedgetype == 'GNMetaNodeEdge')]
          
-        jDF=self.__gnmetaEdgeDF.join(rnodeDF, cond , 'inner')
+        jDF = self.__gnmetaEdgesDF_cached.join(rnodeDF, cond , 'inner')
          
         jDF.show(4)
         e1DF = jDF.select("gnedgeid", "gnedgename", "gnedgetype", "gnsrcnodeid", "gntgtnodeid")
          
         eDF = e1DF.dropDuplicates(['gnedgeid']).sort('gnedgeid')
         ecount = eDF.count()
-        print('GnSrchOps: showing unique edges #nodes '+str(ecount))
+        gnsrch_log('GnSrchOps: showing unique edges #nodes '+str(ecount))
         eDF.show(5)
 
         # Bring all nodes (src and tgt) into a datframe
@@ -438,27 +468,27 @@ class     GNGraphSearchOps:
         res = eDF.withColumn("edgenodes", F.array(mcols))\
                   .select("edgenodes")
         ##_union(col("gntgtnodeid"), col("gnsrcnodeid")))
-        print('GnSrchOps: gnedges filter result 1 ')
+        gnsrch_log('GnSrchOps: gnedges filter result 1 ')
         res.show(5)
 
         f1DF = res.select(F.explode(F.col("edgenodes")).alias("gnnodeid"))
         f1count = f1DF.count()
-        print('GnSrchOps: Filter nodes exploded #nodes '+str(f1count))        
+        gnsrch_log('GnSrchOps: Filter nodes exploded #nodes '+str(f1count))        
         f1DF.show(10)
          
-        print('GnSrchOps: Filtered nodes and remove duplicates ')         
+        gnsrch_log('GnSrchOps: Filtered nodes and remove duplicates ')         
         f2DF = f1DF.select("gnnodeid").distinct().sort("gnnodeid")
         f2count = f2DF.count()
-        print('GnSrchOps: Filter nodes and distict #nodes '+str(f2count))
+        gnsrch_log('GnSrchOps: Filter nodes and distict #nodes '+str(f2count))
         f2DF.show(10)
 
         ### filter enodes from source nodes aka left antijoin (rnodeDF - f1DF)
         derivedNodeDF = rnodeDF.select("gnnodeid").join(f2DF, on=['gnnodeid'], how='left_anti').distinct().orderBy('gnnodeid')
 
-        print('GnSrchOps: Derived nodes ')
+        gnsrch_log('GnSrchOps: Derived nodes ')
         
         nderivedNodes = derivedNodeDF.count()
-        print('GnSrchOps: derived datanodes #of nodes '+str(nderivedNodes))
+        gnsrch_log('GnSrchOps: derived datanodes #of nodes '+str(nderivedNodes))
          
         dnJson = {}
         dnDF = None
@@ -470,8 +500,8 @@ class     GNGraphSearchOps:
                ####print(row['fnodes'])
                derived_NodeList.append(row['gnnodeid'])
             ### now iterate over list and get gnnode
-            print('GnSrchOps: Node info for derived nodes ')
-            print(derived_NodeList)
+            gnsrch_log('GnSrchOps: Node info for derived nodes ')
+            gnsrch_log(derived_NodeList)
             nodelist=[]
             nodeid_list = "( "
             i = 0
@@ -481,98 +511,104 @@ class     GNGraphSearchOps:
                nodeid_list += ""+str(x)+""
                i = i+1
             nodeid_list += ")"
-            print('GnSrchOps: Getting node info for list '+nodeid_list)
+            gnsrch_log('GnSrchOps: Getting node info for list '+nodeid_list)
             sqlstr="SELECT * from gnmetanodes where gnnodeid in "+nodeid_list+" "
-            gn_log('GnGraphSearchOps: executing sql '+sqlstr)
+            gnsrch_log('GnGraphSearchOps: executing sql '+sqlstr)
             dnDF =  self.__spark.sql(sqlstr)
             #resJson = jDF.toJSON().map(lambda j: json.loads(j)).collect()
             ###dnJson = dnDF.toJSON().collect()
-            print('GnSrchOps: Derived nodes json ')
+            gnsrch_log('GnSrchOps: Derived nodes json ')
             #print(dnJson)
             print('GnSrchOps: Derived nodes enumerated ')
             ####print(nodelist)
-        print('GnSrchOps: Completed gnedges fetch ')
+        gnsrch_log('GnSrchOps: Completed gnedges fetch ')
         ##edgesJson = eDF.toJSON().collect()            
         return (eDF, dnDF)
 
 
     def    gngraph_datarepo_qry_getedges(self, dnodeDF, sqlst, nodemode):
 
-        # first map gnedges
-        print('GnSrchOps:datanodes  querying for edges and derived nodes flages ')
-        self.get_metaedges_mapped_df()
-        self.get_metanodes_mapped_df()
+        try:  
+            # first map gnedges
+            gnsrch_log('GnSrchOps:datanodes  querying for edges and derived nodes flages ')
+            self.get_metaedges_mapped_df()
+            self.get_metanodes_mapped_df()
          
-        print('GnSrchOps: Enumerating edges for datanodes on join ')
-        cond=[((self.__gnmetaEdgeDF.gntgtnodeid == dnodeDF.gnnodeid) | (self.__gnmetaEdgeDF.gnsrcnodeid == dnodeDF.gnnodeid)) & (self.__gnmetaEdgeDF.gnedgetype == 'GNDataNodeEdge')]
+            gnsrch_log('GnSrchOps: Enumerating edges for datanodes on join ')
+            cond=[((self.__gnmetaEdgesDF_cached.gntgtnodeid == dnodeDF.gnnodeid) | (self.__gnmetaEdgesDF_cached.gnsrcnodeid == dnodeDF.gnnodeid)) & (self.__gnmetaEdgesDF_cached.gnedgetype == 'GNDataNodeEdge')]
          
-        jDF=self.__gnmetaEdgeDF.join(dnodeDF, cond , 'inner')
-        jDF.show(4)
+            jDF = self.__gnmetaEdgesDF_cached.join(dnodeDF, cond , 'inner')
+            jDF.show(4)
          
-        e1DF = jDF.select("gnedgeid", "gnedgename", "gnedgetype", "gnsrcnodeid", "gntgtnodeid")
+            e1DF = jDF.select("gnedgeid", "gnedgename", "gnedgetype", "gnsrcnodeid", "gntgtnodeid")
          
-        eDF = e1DF.dropDuplicates(['gnedgeid']).sort('gnedgeid')
-        ecount = eDF.count()
-        print('GnSrchOps: showing unique edges #nodes '+str(ecount))
-        eDF.show(5)
+            eDF = e1DF.dropDuplicates(['gnedgeid']).sort('gnedgeid')
+            ecount = eDF.count()
+            gnsrch_log('GnSrchOps: showing unique edges #nodes '+str(ecount))
+            eDF.show(5)
          
-        mcols = [F.col("gnsrcnodeid"), F.col("gntgtnodeid")]          
-        res = eDF.withColumn("edgenodes", F.array(mcols))\
+            mcols = [F.col("gnsrcnodeid"), F.col("gntgtnodeid")]          
+            res = eDF.withColumn("edgenodes", F.array(mcols))\
                   .select("edgenodes")
-        print('GnSrchOps: gnedges filter result 1 ')
-        res.show(5)
+            gnsrch_log('GnSrchOps: gnedges filter result 1 ')
+            res.show(5)
 
-        f1DF = res.select(F.explode(F.col("edgenodes")).alias("gnnodeid"))
-        f1count = f1DF.count()
-        print('GnSrchOps: Filter datanodes exploded #nodes '+str(f1count))
-        f1DF.show(10)
+            f1DF = res.select(F.explode(F.col("edgenodes")).alias("gnnodeid"))
+            f1count = f1DF.count()
+            gnsrch_log('GnSrchOps: Filter datanodes exploded #nodes '+str(f1count))
+            f1DF.show(10)
          
-        print('GnSrchOps: Filtered datanodes and remove duplicates ')
-        f2DF = f1DF.select("gnnodeid").distinct().sort("gnnodeid")
-        f2count = f2DF.count()
-        print('GnSrchOps: Filter nodes and distict #nodes '+str(f2count))
-        f2DF.show(10)
+            gnsrch_log('GnSrchOps: Filtered datanodes and remove duplicates ')
+            f2DF = f1DF.select("gnnodeid").distinct().sort("gnnodeid")
+            f2count = f2DF.count()
+            gnsrch_log('GnSrchOps: Filter nodes and distict #nodes '+str(f2count))
+            f2DF.show(10)
 
-        derivedNodeDF = dnodeDF.select("gnnodeid").join(f2DF, on=['gnnodeid'], how='left_anti').distinct().orderBy('gnnodeid')
+            derivedNodeDF = dnodeDF.select("gnnodeid").join(f2DF, on=['gnnodeid'], how='left_anti').distinct().orderBy('gnnodeid')
          
-        print('GnSrchOps: Enumerating derived datanodes ')
+            gnsrch_log('GnSrchOps: Enumerating derived datanodes ')
         
-        nderivedNodes = derivedNodeDF.count()
-        print('GnSrchOps: derived datanodes #of nodes '+str(nderivedNodes))
-        dnJson = {}
-        dnDF = None
-        if (nderivedNodes > 0):
-            derivedNodeDF.show(10)
-            deriveNodeList = derivedNodeDF.collect()
-            derived_NodeList=[]
-            for row in derivedNodeList:
-               ####print(row['fnodes'])
-               derived_NodeList.append(row['gnnodeid'])
-            ### now iterate over list and get gnnode
-            print('GnSrchOps: Node info for derived datanodes ')
-            print(derived_NodeList)
-            nodelist=[]
-            nodeid_list = "( "
-            i = 0
-            for x in derived_NodeList:
-               if (i > 0):
-                  nodeid_list += ","
-               nodeid_list += ""+str(x)+""
-               i = i+1
-            nodeid_list += ")"
-            print('GnSrchOps: Getting node info for list '+nodeid_list)
-            sqlstr="SELECT * from gnmetanodes where gnnodeid in "+nodeid_list+" "
-            gn_log('GnGraphSearchOps: executing sql '+sqlstr)
-            dnDF =  self.__spark.sql(sqlstr)
-            #resJson = jDF.toJSON().map(lambda j: json.loads(j)).collect()
-            ###dnJson = dnDF.toJSON().collect()
-            dnCount = dnDF.count()
-            print('GnSrchOps: Derived datanodes enumerated #nodes '+str(dnCount))            
+            nderivedNodes = derivedNodeDF.count()
+            gnsrch_log('GnSrchOps: derived datanodes #of nodes '+str(nderivedNodes))
+            dnJson = {}
+            dnDF = None
+            if (nderivedNodes > 0):
+                derivedNodeDF.show(10)
+                deriveNodeList = derivedNodeDF.collect()
+                derived_NodeList=[]
+                for row in derivedNodeList:
+                    ####print(row['fnodes'])
+                    derived_NodeList.append(row['gnnodeid'])
+                ### now iterate over list and get gnnode
+                gnsrch_log('GnSrchOps: Node info for derived datanodes ')
+                gnsrch_log(derived_NodeList)
+                nodelist=[]
+                nodeid_list = "( "
+
+            
+                i = 0
+                for x in derived_NodeList:
+                    if (i > 0):
+                        nodeid_list += ","
+                    nodeid_list += ""+str(x)+""
+                    i = i+1
+                nodeid_list += ")"
+                gnsrch_log('GnSrchOps: Getting node info for list '+nodeid_list)
+                sqlstr="SELECT * from gnmetanodes where gnnodeid in "+nodeid_list+" "
+                gnsrch_log('GnGraphSearchOps: executing sql '+sqlstr)
+                dnDF =  self.__spark.sql(sqlstr)
+                #resJson = jDF.toJSON().map(lambda j: json.loads(j)).collect()
+                ###dnJson = dnDF.toJSON().collect()
+                dnCount = dnDF.count()
+                gnsrch_log('GnSrchOps: Derived datanodes enumerated #nodes '+str(dnCount))
+        except Exception as err:
+            gnsrch_log('GnSrchOps: Exception received '+str(err))
+            eDF = None
+            dbDF = None
+            
         ####print(nodelist)
-        print('GnSrchOps: Completed datanodes gnedges fetch ')            
+        gnsrch_log('GnSrchOps: Completed datanodes gnedges fetch ')            
         return (eDF, dnDF)
-
-
 
 
     
@@ -590,47 +626,12 @@ def       gngraph_init(rootDir):
 
 
 
-def     gngrph_srch_get_entlist_obsolete(sqlst):
-
-    print('gnsrch_process_select_conevert: processing sqlstring ' + sqlst)
-
-    jsql = parse(sqlst)
-    selstr = "select"
-    retval = 0
-    cql = ''
-    if (selstr in jsql):
-        # Select statement
-
-        print('gnsrch_process_select_convert_cypher: Processing select:')
-        attrlist = jsql[selstr]
-        entlist = jsql["from"]
-
-        print('gnsrch_process_select_convert_cypher: attrlist:' + attrlist)
-        print('gnsrch_process_select_convert_cypher: entitylist:' + entlist)
-        #if (attrlist == "*"):
-            # Ex: Select * from Customer
-        #    cql += "MATCH (" + str(entlist) + " "
-        #    cql += "{metanode:'" + str(entlist) + "'}) "
-        #    cql += " return " + str(entlist) + " LIMIT 10 ;"
-
-        #    if (verbose > 4):
-        #        print('gnsrch_process_select_convert_cypher: cqlqry :' + cql)   
-        #    return cql
-        nodes_list = []
-        if (isinstance(entlist, list)):
-            nodes_list = entlist
-        else:
-            # for single node entry, entlist is a string
-            nodes_list.append(entlist)
-
-        
-        return nodes_list
-
-
 
 def        gngrph_search_init(gnp_spark, gndata_folder, gngraph_creds_folder, accessmode):
 
-        print('GnSrchOps: Init SearchOps using spark session ')
+
+        gnsrch_log('GnSrchOps: ####################### Searching initialization ##############')
+        gnsrch_log('GnSrchOps: Init SearchOps using spark session ')
         gdb_creds_filepath=gngraph_creds_folder+"/gngraph_pgres_dbcreds.json"
         fileargs = {}
         gdbargs = {}
@@ -653,24 +654,30 @@ def        gngrph_search_init(gnp_spark, gndata_folder, gngraph_creds_folder, ac
         gnsrch_ops.get_metanodes_mapped_df()
         gnsrch_ops.get_metaedges_mapped_df()
         if (gnsrch_ops.srch_init_data_status() == 1):
-            print('GnSrchOps: ERROR srchops init failed  ')
+            gnsrch_log_err('GnSrchOps: ERROR srchops init failed  ')
             gnsrch_ops = ''
             return gnsrch_ops
 
         
-        print('GnSrchOps: gngraph searchOps init COMPLETE ')
+        gnsrch_log('GnSrchOps: gngraph searchOps init COMPLETE ')
         return gnsrch_ops
 
     
 def        gngrph_srch_datarepo_qry_execute(gnsrch_ops, sqlst, nodemode):
                 
-    
-    (resNodeDF, nodesjson) = gnsrch_ops.gngraph_execute_sqlqry(sqlst)
-    #resNodeDF.show(10)
-    nodeCount = resNodeDF.count()
-    print('GnSrchOps: datanodes fetched #nodes '+str(nodeCount))
     ejson = {}
     njson = {}
+    
+    (resNodeDF, nodesjson, status) = gnsrch_ops.gngraph_execute_sqlqry(sqlst)
+
+    if (status == "ERROR"):
+        gnsrch_log('GnSrchOps: datarepo qry failed ')
+        return (nsjon, ejson)
+            
+    #resNodeDF.show(10)
+    nodeCount = resNodeDF.count()
+    gnsrch_log('GnSrchOps: datanodes fetched #nodes '+str(nodeCount))
+    
     if (nodeCount > 0):    
         resNodeDF.show(5)
 
@@ -709,34 +716,35 @@ def        gngrph_srch_datarepo_qry_execute(gnsrch_ops, sqlst, nodemode):
                       # Combine the derived nodes to source nodes
                       rDF = nDF.unionByName(dnDF1, allowMissingColumns=True)
                       njson = rDF.toJSON().collect()
-                      print('GnSrchOps:  Nodes Json ')
+                      #gnsrch_log('GnSrchOps:  Nodes Json ')
                       #print(njson)
-                      print('GnSrchOps:  Edges Json ')
+                      #print('GnSrchOps:  Edges Json ')
                       #print(ejson) 
                       
-    print('GnSrchOps: datanodes and edges qry complete SUCCESS')
+    gnsrch_log('GnSrchOps: datanodes and edges qry complete SUCCESS')
     return (njson, ejson)
 
 #######
-def          gngrph_srch_metarepo_qry_execute(gnsrch_ops, gnp_spark, sqlst, nodesonly):
+def          gngrph_srch_metarepo_qry_execute(gnsrch_ops, gnp_spark, sqlst, nodemode):
     
         njson = {}
         ejson = {}
         ###gnsrch_ops.gngraph_meta_nodes_edges_setup()
 
         if (gnsrch_ops.srch_init_meta_status() == 0):
-            gn_log('GnSrchOps: Meta data initialized is not completed ')
-            njson = {}
-            edgesjson = {}
-            return (njson, edgesjson)
+            gnsrch_log('GnSrchOps: Meta data initialized is not completed ')            
+            return (njson, ejson)
             
-        (resNodeDF, nodesjson) = gnsrch_ops.gngraph_execute_sqlqry(sqlst)
+        (resNodeDF, nodesjson, status) = gnsrch_ops.gngraph_execute_sqlqry(sqlst)
 
-        print('GnSrchOps: metanodes  fetched ')
-        print('GnSrchOps: sql st:'+sqlst)
+        if (status == "ERROR"):
+            gnsrch_log('GnSrchOps: meta query failed ')
+            return (njson, ejson)
+        
+        gnsrch_log('GnSrchOps: metanodes  fetched ')
         ##print(nodesjson)
         nnodes = resNodeDF.count()
-        print('GnSrchOps: metanodes for search returned #nodes '+str(nnodes))
+        gnsrch_log('GnSrchOps: metanodes for search returned #nodes '+str(nnodes))
         if (nnodes > 0):        
             resNodeDF.show(5)
             ## Prepare njson output
@@ -746,7 +754,7 @@ def          gngrph_srch_metarepo_qry_execute(gnsrch_ops, gnp_spark, sqlst, node
             njson = nDF.toJSON().collect()
             
             
-            if (nodesonly == 0): 
+            if (nodemode == 2): 
                ### Need to derive edges and derived nodes 
                (eDF, dnDF) = gnsrch_ops.gngraph_metarepo_qry_getedges(resNodeDF, sqlst, 0)
 
@@ -773,12 +781,12 @@ def          gngrph_srch_metarepo_qry_execute(gnsrch_ops, gnp_spark, sqlst, node
                       rDF = nDF.unionByName(dnDF1, allowMissingColumns=True)
 
                       njson = rDF.toJSON().collect()
-                      print('GnSrchOps:  Nodes Json ')
-                      print(njson)
-                      print('GnSrchOps:  Edges Json ')
-                      print(ejson)        
+                      #print('GnSrchOps:  Nodes Json ')
+                      #print(njson)
+                      #print('GnSrchOps:  Edges Json ')
+                      #print(ejson)        
 
-        print('GnSrchOps: Meta edges and derived nodes enumerated ')           
+        gnsrch_log('GnSrchOps: Meta edges and derived nodes enumerated ')           
         return (njson, ejson)
         
 
@@ -786,13 +794,13 @@ def          gngrph_srch_metarepo_qry_execute(gnsrch_ops, gnp_spark, sqlst, node
 def         gngrph_srch_datarepo_qry_fetch_api(gnsrch_ops, gnp_spark, sqlst, nodemode, lnodes):
 
     
-    gn_log('GnSrchOps: datanodes qry fetch ')
+    gnsrch_log('GnSrchOps: datanodes qry fetch ')
 
     (retval, msg, sql_formatted) = gnsrch_ops.gngraph_search_setup(sqlst, lnodes)
 
 
     if (retval < 0):
-        print('GnSrchOps: Search failed with msg '+msg)           
+        gnsrch_log('GnSrchOps: search failed with msg '+msg)           
         rJ = {}
         rJ["nodes"] = []
         rJ["edges"] = []
@@ -812,8 +820,8 @@ def         gngrph_srch_datarepo_qry_fetch_api(gnsrch_ops, gnp_spark, sqlst, nod
     rJ["edges"] = eJson
     rJ["edgelen"] = len(rJ["edges"])
     rJ["status"] = "SUCCESS"
-    print('GnSrchOps: datanodes qry enumerated '+str(rJ["nodelen"]))
-    print('GnSrchOps: datanodes edges enumerated '+ str(rJ["edgelen"]))
+    gnsrch_log('GnSrchOps: datanodes qry enumerated '+str(rJ["nodelen"]))
+    gnsrch_log('GnSrchOps: datanodes edges enumerated '+ str(rJ["edgelen"]))
     
     return(rJ)
 
@@ -822,7 +830,7 @@ def        gngrph_srch_metarepo_qry_fetch_nodes_api(gnsrch_ops, gnp_spark, srchf
     
     sqlst = "select * from gnmetanodes WHERE gnnodetype='GNMetaNode' OR gnnodetype='GNMetaNodeAttr'"
     
-    print("GnSrchOps: searching metarepo fetch srchfilter "+srchfilter)
+    gnsrch_log("GnSrchOps: searching metarepo fetch srchfilter "+srchfilter)
     if (gnsrch_ops.srch_init_meta_status() == 0):
         rj={}
         rj["nodes"]=[]
@@ -844,7 +852,7 @@ def        gngrph_srch_metarepo_qry_fetch_nodes_api(gnsrch_ops, gnp_spark, srchf
     rJ["nodelen"] = len(rJ["nodes"])
     rJ["edgelen"] = len(rJ["edges"])
     rJ["status"] = "SUCCESS"
-    print('GnSrchOps: Meta nodes fetched')
+    gnsrch_log('GnSrchOps: Meta nodes fetched')
     #print(rJ)
      
     return(rJ)
@@ -854,22 +862,23 @@ def        gngrph_srch_metarepo_qry_fetch_api(gnsrch_ops, gnp_spark, srchfilter)
     
     sqlst = "select * from gnmetanodes WHERE gnnodetype='GNMetaNode' OR gnnodetype='GNMetaNodeAttr'"
     
-
     if (gnsrch_ops.srch_init_meta_status() == 0):
-        rj={}
-        rj["nodes"]=[]
-        rj["edges"]=[]
-        rJ["nodelen"] = 0
-        rJ["edgelen"] = 0
-        rJ["status"] = "ERROR"
+        rj = {
+            "nodes": [],
+            "edges": [],
+            "nodelen": 0,
+            "edgelen": 0,
+            "status": "ERROR"
+            }
         return rj
-    print("GnSrchOps: searching for metarepo srchfilter :" + srchfilter)
     
-    if (srchfilter == ""):
-        (mnJson, meJson) = gnsrch_ops.gngrph_metarepo_get()
-    else:
-        nodesonly = 0
-        (mnJson, meJson) = gngrph_srch_metarepo_qry_execute(gnsrch_ops, gnp_spark, sqlst, nodesonly)
+    gnsrch_log("GnSrchOps: searching for metarepo srchfilter :" + srchfilter)
+    
+    #if (srchfilter == ""):        
+    #    (mnJson, meJson) = gnsrch_ops.gngrph_metarepo_get()
+    #else:
+    nodemode = 2
+    (mnJson, meJson) = gngrph_srch_metarepo_qry_execute(gnsrch_ops, gnp_spark, sqlst, nodemode)
         
     rJ = {}
 
@@ -878,7 +887,7 @@ def        gngrph_srch_metarepo_qry_fetch_api(gnsrch_ops, gnp_spark, srchfilter)
     rJ["nodelen"] = len(rJ["nodes"])
     rJ["edgelen"] = len(rJ["edges"])
     rJ["status"] = "SUCCESS"
-    print('GnSrchOps: Meta nodes and edges and derived nodes fetched')
+    gnsrch_log('GnSrchOps: Meta nodes and edges and derived nodes fetched')
     #print(rJ)
      
     return(rJ)
@@ -887,10 +896,10 @@ def        gngrph_srch_metarepo_qry_fetch_api(gnsrch_ops, gnp_spark, srchfilter)
 
 def        test_datarepo_qry_fn():
 
-    print("GnSrchOps: Test gnsearch datarepo qry ")    
+    gnsrch_log("GnSrchOps: Test gnsearch datarepo qry ")    
     app_name="gngraph"
-    gndata_folder=pparentDir+"/gndata"
-    gngraph_creds_folder = pparentDir+"/creds/gngraph"
+    gndata_folder=gnRootDir+"/gndata"
+    gngraph_creds_folder = gnRootDir+"/creds/gngraph"
         
     sqlst = "SELECT * from Customer LIMIT 10000"                
     
@@ -905,8 +914,8 @@ def        test_datarepo_qry_fn():
     rJ = gngrph_srch_datarepo_qry_fetch_api(gngrph_cls, gnp_spark, sqlst,  nodesonly)
 
     if (rJ["status"] == "ERROR"):
-        print('GnSrchOps: Testing search query failed ')
-        print('GnSrchOps: Err msg: '+rJ["errmsg"])
+        gnsrch_log('GnSrchOps: Testing search query failed ')
+        gnsrch_log('GnSrchOps: Err msg: '+rJ["errmsg"])
         return
     
     
@@ -932,17 +941,29 @@ def     gnspk_process_request_thrfn(gngrph_cls, gnp_spark, req):
         resp["status"] = "SUCCESS"
         resp["data"] = rJ
         return resp
+    
     if (req["cmd"] == "metanodes"):
        rJ = gngrph_cls.gngrph_metarepo_nodes_get()
        resp = {}
        resp["cmd"] = req["cmd"]
        resp["status"] = "SUCCESS"
        resp["data"] = rJ
-       print('GnSrchOps: metanodes get resp')
-       print(resp)
+       gnsrch_log('GnSrchOps: metanodes get resp')
+       gnsrch_log(resp)
+       return resp
+
+    if (req["cmd"] == "metaremap"):
+       nodemode = req["nodemode"]       
+       rJ = gngrph_cls.gngrph_metarepo_remap(nodemode)
+       resp = {}
+       resp["cmd"] = req["cmd"]
+       resp["status"] = "SUCCESS"
+       resp["data"] = rJ
+       gnsrch_log('GnSrchOps: meta repo remap get resp')
+       gnsrch_log(resp)
        return resp
    
-     ## datasearch
+    ## datasearch
     if (req["cmd"] == "datasearch"):
         sqlst = req["args"]
         
@@ -968,13 +989,13 @@ def     gnspk_process_request_thrfn(gngrph_cls, gnp_spark, req):
 
             
 def     gnspk_thread_main(gnRootDir, accessmode, req_q, resp_q):
-    
-    print('GnSrchOps: Starting Spark Session thread ')
+
+    gnsrch_log('GnSrchOps: Starting Spark Session thread ')
     app_name = "gngraph"
     gndata_folder = gnRootDir+"/gndata"
     gngraph_creds_folder = gnRootDir+"/creds/gngraph"
 
-    gn_log('GnSrchOpsThr: Initializing Spark Session thread ' )
+    gnsrch_log('GnSrchOpsThr: Initializing Spark Session thread ' )
 
     conf = SparkConf()
     conf.set('spark.executor.memory', '4g')
@@ -988,12 +1009,12 @@ def     gnspk_thread_main(gnRootDir, accessmode, req_q, resp_q):
   
     ### Initialized Spark Session and now wait for some task
     while True:
-        print('GnSrchOps: Thread waiting for request ')
+        gnsrch_log('GnSrchOps: Thread waiting for request ')
         req = req_q.get()
 
 
         if (req is None):
-            print('Empty request returned ')
+            gnsrch_log('GnSrchOps: Empty request returned ')
             req_q.task_done()
             return
         else:
@@ -1002,7 +1023,7 @@ def     gnspk_thread_main(gnRootDir, accessmode, req_q, resp_q):
             resp_q.put(resp)
             
         time.sleep(4)
-        print('GnSrchOps: Processing of message done')
+        gnsrch_log('GnSrchOps: Processing of message done')
         
     
 
@@ -1027,7 +1048,7 @@ def       gnp_spark_thread_setup(gnRootDir, accessmode):
     return gnspk_thr_config
 
 def       gnp_spark_thread_join(gnspk_thr_config):
-    print(' Joining for the thread ')
+    gnsrch_log(' Joining for the thread ')
     gnspk_thr_config["spkthr"].join()
 
     
@@ -1045,7 +1066,7 @@ def       gnp_spark_thread_send_receive_task(gnspk_thr_config, tskmsg):
 
 def     gnp_spark_app_server_socket(gnRootDir):
     
-    print("Starting the gnspark thread application")
+    gnsrch_log("GnSrchOps: Starting the gnspark thread application")
     app_name="gngraph"
 
     ##gndata_folder=pparentDir+"/gndata"
@@ -1053,7 +1074,7 @@ def     gnp_spark_app_server_socket(gnRootDir):
     accessmode={'sfmode': 1, 'dbmode':0 }
     gnspk_thr_cfg = gnp_spark_thread_setup(gnRootDir, accessmode)
 
-    print(" Starting socket server...")
+    gnsrch_log("GnSrchOps:  Starting socket server...")
     
     SERVER_HOST = "0.0.0.0"
     SERVER_PORT = 4141
@@ -1064,21 +1085,21 @@ def     gnp_spark_app_server_socket(gnRootDir):
     s.bind((SERVER_HOST, SERVER_PORT))
     s.listen(10)
     
-    print(f"[*] Listening as {SERVER_HOST}:{SERVER_PORT}")
-    print("Waiting for the client to connect... ")
+    ##print(f"[*] Listening as {SERVER_HOST}:{SERVER_PORT}")
+    ##print("Waiting for the client to connect... ")
 
     while True:
         
         client_sock, address = s.accept()
     
-        print(f"[+] {address} is connected.")
+        ##print(f"[+] {address} is connected.")
         received = client_sock.recv(BUFFER_SIZE).decode()
-        print('GnSrchOps: received command ')
-        print(received)
+        gnsrch_log('GnSrchOps: received command: '+str(received))
         
         ##(cmd, args, nodeonly) = received.split(SEPARATOR)
         cmdJ = json.loads(received)
-        print(cmdJ)
+        gnsrch_log('GnSrchops: ')
+        gnsrch_log(cmdJ)
         tskmsg = cmdJ
         
         resp = gnp_spark_thread_send_receive_task(gnspk_thr_cfg, tskmsg)
@@ -1086,7 +1107,7 @@ def     gnp_spark_app_server_socket(gnRootDir):
         ###progress = tqdm.tqdm(range(filesize), f"Receiving {filename}", unit="B", unit_scale=True, unit_divisor=1024)
         # Send message 
         client_sock.sendall(resp_str.encode())
-        print(f" sent the response back ")
+        ##print(f" sent the response back ")
     
         #with open(filename, "wb") as f:
         #    while True:
@@ -1107,7 +1128,7 @@ def     gnp_spark_app_server_socket(gnRootDir):
         
 def     test_spkthread_fns(gnRootDir):
 
-    print("Testing the metarepo file")
+    ##print("Testing the metarepo file")
     app_name="gngraph"
 
     ##gndata_folder=pparentDir+"/gndata"
@@ -1141,8 +1162,8 @@ def     test_metarepo_qry_fn():
     print("Testing the metarepo file")
     app_name="gngraph"
 
-    gndata_folder=pparentDir+"/gndata"
-    gngraph_creds_folder = pparentDir+"/creds/gngraph"
+    gndata_folder=gnRootDir+"/gndata"
+    gngraph_creds_folder = gnRootDir+"/creds/gngraph"
         
     sqlst = "select * from gnmetanodes WHERE gnnodetype='GNMetaNode' OR gnnodetype='GNMetaNodeAttr'"
     ### Set spark session
@@ -1171,5 +1192,5 @@ if __name__ == "__main__":
  #test_metarepo_qry_fn()
  #test_datarepo_qry_fn()
  #test_spkthread_fns(pparentDir)
- gnp_spark_app_server_socket(pparentDir)
+ gnp_spark_app_server_socket(gnRootDir)
  print('Gngraph Search Thread exiting ')
