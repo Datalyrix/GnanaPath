@@ -197,7 +197,8 @@ def upload_file():
                     nodename = datasetname
                 gn_log('GNAppSrv: Ingest file '+nodename+ ' Business  Domain '+bizdomain)    
                 gngraph_ingest_file_api(filename, ftype, fdelim, nodename, bizdomain, app.config["gnDataFolder"], app.config["gnGraphDBCredsFolder"], app.config["gnCfgSettings"])
-  
+                gn_log('GnAppSrv: Uploaded new file. Remap metarepo ')
+                res = gngraph_search_client.gnsrch_meta_remap_request()
                 
         flash(f'File {filename} successfully uploaded', 'success')
         ####return redirect(url_for('gn_home', disp_srch=_srch))
