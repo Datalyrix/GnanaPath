@@ -19,11 +19,13 @@ def     gn_logging_init(logname):
         os.mkdir(gnLogDir)
 
     gnLogFile = "gnpath.log"
-    logfilepath = gnLogDir+"/"+gnLogFile     
+    logfilepath = gnLogDir+"/"+gnLogFile
+    
     logging.basicConfig(filename=logfilepath, filemode='a', \
-                        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',\
-                        level=logging.INFO)
+                       format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',\
+                       level=logging.INFO)
     logger = logging.getLogger(logname)
+
     return logger
 
 
