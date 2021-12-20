@@ -4,7 +4,7 @@ import pandas as pds
 import json
 import pathlib
 from pyspark.sql.functions import from_json, col
-from gnutils.gn_log import gn_log, gn_log_err
+from gnutils.gn_srch_log import gnsrch_log, gnsrch_log_err
 
 """
 gngraph static fileops implementation for search (spark-based) 
@@ -40,7 +40,7 @@ class  GNGraphSrchStaticFileOps:
             #    self.__gnmetaNodeDF.createOrReplaceTempView("gnmetaedges")
                 self.__init_failed = 0
             except:
-                gn_log_err('GNStaticFileOps:  error reading file '+self.gnmetanode_filepath)
+                gnsrch_log_err('GNStaticFileOps:  error reading file '+self.gnmetanode_filepath)
                 self.__init_failed = 1
             
     def  get_metanode_info(self, node, spk):
@@ -48,19 +48,19 @@ class  GNGraphSrchStaticFileOps:
        jobj = {}
        
        if spk is None:
-           gn_log_err('GnStaticFOps: spark session is not found')
+           gnsrch_log_err('GnStaticFOps: spark session is not found')
            return jobj
 
        if self.__init_failed == 1:
-           gn_log_err('GNStaticFileOps: Static Files Init failed ')
+           gnsrch_log_err('GNStaticFileOps: Static Files Init failed ')
            return jobj
        
        sqlstr = "SELECT * FROM gnmetanodes where gnnodename='"+node+"'"
-       print('GnStaticFOps:  getting metanode info '+node+' sqlstr '+sqlstr)
+       gnsrch_log('GnStaticFOps:  getting metanode info '+node+' sqlstr '+sqlstr)
        nodeEnt = spk.sql(sqlstr)
        nodeCount = nodeEnt.count()
        if (nodeCount == 0):
-           print('GnStaticFOps: node '+node+' does not exists')
+           gnsrch_log('GnStaticFOps: node '+node+' does not exists')
            return jobj
        
        ##nodeEnt.show()
@@ -68,22 +68,29 @@ class  GNGraphSrchStaticFileOps:
        return jobj
                        
     def datanode_flatten_jsonfields(self, baseDataNodeDF, spk):
-        print('Flattening datanode fields: ')
-        # First flatten gndatanodeobj
-        n1_df = spk.read.json(baseDataNodeDF.rdd.map(lambda row: row.gndatanodeobj))
+        gnsrch_log('GnStaticFOps: Flattening datanode fields: ')
+
+        try:
+            # First flatten gndatanodeobj
+            n1_df = spk.read.json(baseDataNodeDF.rdd.map(lambda row: row.gndatanodeobj))
         
-        n1_df.show(2)
-        n1_schema = n1_df.schema
-        print(' Flattening n1_schema datanodeobj ')
-        print(n1_schema)
-        n2_schema = spk.read.json(baseDataNodeDF.rdd.map(lambda row: row.gndatanodeprop)).schema
-        print('  Flattening n2_schema datanodeprop ')
-        print(n2_schema)
+            n1_df.show(2)
+            n1_schema = n1_df.schema
+            gnsrch_log('GnStaticFOps: Flattening n1_schema datanodeobj ')
+            gnsrch_log(n1_schema)
+            n2_schema = spk.read.json(baseDataNodeDF.rdd.map(lambda row: row.gndatanodeprop)).schema
+            gnsrch_log('  Flattening n2_schema datanodeprop ')
+            gnsrch_log(n2_schema)
         
-        datanodeFlattenDF = baseDataNodeDF.withColumn("gndatanodeobj", from_json("gndatanodeobj", n1_schema)) \
+            datanodeFlattenDF = baseDataNodeDF.withColumn("gndatanodeobj", from_json("gndatanodeobj", n1_schema)) \
                           .withColumn("gndatanodeprop", from_json("gndatanodeprop", n2_schema)) \
                           .select(col("gnnodeid"), col("gnnodetype"), col("gnmetanodeid"), col("gndatanodeobj.*"), col("gndatanodeprop.*"), col("uptmstmp"))
 
+        except Exception as err:
+            gnsrch_log_err('GnStaticFOps: Flatten fields ran into Exception '+str(err))
+            datanodeFlattenDF = None
+
+            
         return datanodeFlattenDF
 
         
@@ -111,7 +118,7 @@ class  GNGraphSrchStaticFileOps:
         # map the datanode file to spark dataframe
         edgefile = "gnmetaedges.json"
         edge_fpath = self.gndata_graph_data_folder+"/"+edgefile
-        print('GnStaticFOps: Mapping gnmetaedges ')
+        gnsrch_log('GnStaticFOps: Mapping gnmetaedges ')
 
         #if we already mapped df just return
         if (self.__gnmetaEdges_mapped == 1):
@@ -134,7 +141,7 @@ class  GNGraphSrchStaticFileOps:
             self.__gnmetaEdgeDF = None
             self.__gnmetaEdges_mapped = 0
             
-        print('GnStaticFOps: gnmetaedges are mapped to df SUCCESS')    
+        gnsrch_log('GnStaticFOps: gnmetaedges are mapped to df SUCCESS')    
         return self.__gnmetaEdgeDF
 
     
@@ -144,10 +151,10 @@ class  GNGraphSrchStaticFileOps:
         # map the datanode file to spark dataframe
         mnodefile = "gnmetanodes.json"
         mnodes_fpath = self.gndata_graph_data_folder+"/"+mnodefile
-        print('GnStaticFOps: Mapping gnmetanodes ')
+        gnsrch_log('GnStaticFOps: Mapping gnmetanodes ')
 
         if (self.__gnmetaNodes_mapped == 1):
-            print('GnStaticFOps: gnmetanodes are already mapped ')
+            gnsrch_log('GnStaticFOps: gnmetanodes are already mapped ')
             return self.__gnmetaNodeDF
         
         retDF = None
@@ -155,7 +162,7 @@ class  GNGraphSrchStaticFileOps:
            metaNodeDF = spk.read.json(mnodes_fpath)
            metaNodeDF.show(2)
            mnode_schema = spk.read.json(metaNodeDF.rdd.map(lambda row: row.gnnodeprop)).schema
-           print(mnode_schema)
+           #gnsrch_log(mnode_schema)
            self.__gnmetaNodeDF = metaNodeDF.withColumn("gnnodeprop", from_json("gnnodeprop", mnode_schema)).select(col('gnnodeid'), col('gnnodename'), col('gnnodetype'), col('gnnodeprop.*'))
            self.__gnmetaNodeDF.show(2)
            # also map the node to tempview with nodename
@@ -163,16 +170,16 @@ class  GNGraphSrchStaticFileOps:
            self.__gnmetaNodes_mapped = 1
         else:
             self.__gnmetaNodeDF = None
-        print("GnStaticFOps: gnmetanodes are mapped to df SUCCESS")    
+        gnsrch_log("GnStaticFOps: gnmetanodes are mapped to df SUCCESS")    
         return self.__gnmetaNodeDF
 
     def  get_bizrule_metainfo(self, bizrid, spk):
 
        if spk is None:
-          print('GNPgresSrchOps: spark is none ')
+          gnsrch_log_err('GnStaticFOps: spark is none ')
 
        sqlstr = "SELECT * FROM gnbizrules where gnrelid='"+bizrid+"'"
-       print('GNPgresSrchOps: get_bizrule_metainfo:  sqlstr '+sqlstr)
+       gnsrch_log('GnStaticFOps: get_bizrule_metainfo:  sqlstr '+sqlstr)
        bizrEnt = spk.sql(sqlstr)
        #bizrEnt.show()
        jobj = json.loads(bizrEnt.toJSON().first())

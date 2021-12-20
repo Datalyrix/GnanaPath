@@ -707,7 +707,11 @@
 		    gn_elements = JSON.parse(s);
 		    //console.log(' GnFetch MetaNodes '+JSON.stringify(gn_elements, null, 2));
 		    loader_id.style.display = "none";
-		    stlbl.innerHTML = " MetaNodes: "+cy_mnodes+" &emsp;&emsp; Click on nodes to get data";
+		    if (cy_mnodes == 0) {
+			stlbl.innerHTML=" MetaNodes: "+cy_mnodes+" &emsp;&emsp; Empty Metanodes";
+		    } else {
+			stlbl.innerHTML = " MetaNodes: "+cy_mnodes+" &emsp;&emsp; Click on nodes to get data";
+		    }
 		    return(gn_elements);
 		});
 

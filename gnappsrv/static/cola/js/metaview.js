@@ -22,6 +22,10 @@
         cy.style().fromString( stylesheet ).update();
       } else {
           cy.style().fromJson( stylesheet ).update();
+	  cy.style()
+	      .selector('node')
+	      .style('background-color', function(ele) { if(ele.data('ntype') == "GNMetaNode") return "#0070C0"; else return "#aa0755"; })
+	      .update();
 	  cy.minZoom(0.00);
 	  cy.maxZoom(10);
       }
