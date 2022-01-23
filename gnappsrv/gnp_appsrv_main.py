@@ -12,8 +12,11 @@ import flask
 from flask import request, jsonify, request, redirect, render_template, flash, url_for, session, Markup, abort
 from werkzeug.utils import secure_filename
 from flask_login import login_required, current_user, login_user, logout_user, LoginManager
+from werkzeug.security import generate_password_hash
+from auth.network_users import NetworkUser
 import base64
-import reg_users
+import hashlib
+from auth.reg_users import User
 from moz_sql_parser import parse
 import json
 import re
@@ -32,26 +35,10 @@ sys.path.append(listDir)
 from gnutils.gn_log import gn_log, gn_log_err
 from gn_config import gn_config_init, GNGraphConfigModel, GNGraphDBConfigModel, gn_pgresdb_getconfiguration
 
-##from gndatadis.gndd_csv_load import gndwdbDataUpload  # to upload Files.
-##from gnutils.get_config_file import get_config_neo4j_conninfo_file
-##from gndwdb.gndwdb_neo4j_fetchops import gndwdb_metarepo_nodes_fetch_api, gndwdb_metarepo_edges_fetch_api
-##from gnsearch.gnsrch_sql_srchops import gnsrch_sqlqry_api
-###from gndwdb.gndwdb_neo4j_conn import gndwdb_neo4j_conn_check_api, gndwdb_neo4j_parse_config
-
-###from gngraph.ingest.gngraph_ingest_main import gngraph_init
 from gndatadis.gndd_filedb_ops import gndd_filedb_insert_file_api, gndd_filedb_filelist_get
-
-###from gndatadis.gndd_filelist_table import GNFileLogResults
-
-##from gngraph.search.gngraph_search_main import gngrph_search_init, gngrph_srch_metarepo_qry_fetch_api, gngrph_srch_metarepo_qry_fetch_nodes_api, gngrph_srch_datarepo_qry_fetch_api
 
 from gngraph.search  import gngraph_search_client
 from gngraph.ingest.gngraph_ingest_pd import gngraph_ingest_file_api
-
-#from gngraph.search.gngraph_search_client import gngrph_metaqry_request, gngrph_datarepo_qry_request, gngrph_metanodes_get_request, gngraph_search_service_init
-
-###from gngraph.gngraph_dbops.gngraph_pgresdbops import GNGraphPgresDBOps, GNGraphPgresDBMgmtOps
-
 
 
 # Append system path
@@ -81,24 +68,10 @@ app.config["gnRootDir"] = path.rsplit('/', 1)[0]
 ### Intialize config directories and logging
 gn_config_init(app)
 
-###gnlogger = gn_logging_init(app, "GNPath")
-
-# file Upload
-###UPLOAD_FOLDER = os.path.join(path, 'uploads')
-##UPLOAD_FOLDER = app.config["gnUploadsFolder"]
-
-
-# Make directory if uploads is not exists
-##if not os.path.isdir(UPLOAD_FOLDER):
-##    os.mkdir(UPLOAD_FOLDER)
-
 
 gngraph_init_flag = 0
 # set this flag to 1 if we want to use spark thread 
 gnp_thread_flag=1
-
-
-
 
    
 # Allowed extension you can set your own
@@ -107,8 +80,19 @@ ALLOWED_EXTENSIONS = set(['csv', 'json', ])
 login_manager = LoginManager()
 login_manager.init_app(app)
 
-usr = reg_users.User()
-all_users = {"gnadmin": usr}
+deploy_mode = os.getenv("GN_DEPLOY_MODE")
+
+if deploy_mode == "Sandbox":
+   app.config["deploy_mode"] = deploy_mode
+   app.config["auth_server"] = os.getenv("GN_AUTH_SERVER")
+   app.config["auth_server_port"] = os.getenv("GN_AUTH_SERVER_PORT")
+   app.config["gn_acct_id"] =  os.getenv("GNACCTID")
+   app.config["gn_serv_id"] =  os.getenv("GNSERVID")
+   app.config["auth_server_login"] = 1
+   all_users = {}
+else:
+   usr = User()
+   all_users = {"gnadmin": usr}
 
 
 def allowed_file(filename):
@@ -412,6 +396,24 @@ def user_login():
         return render_template('login.html', title='Login ', form=form)
 
     username = request.form["username"]
+    password = request.form["password"]
+
+    if "auth_server_login" in app.config and app.config["auth_server_login"] == 1:
+        
+        auth_user = NetworkUser(app.config["auth_server"], app.config["auth_server_port"])
+        encd = password.encode()
+        res = hashlib.sha256(encd)
+        ##passw_hash = generate_password_hash(password)
+        passw_hash = res.hexdigest()
+        status = auth_user.verify_user_pwhash(username, passw_hash, app.config["gn_acct_id"])
+        if status == 1:
+            all_users[username] = auth_user
+            login_user(auth_user)
+            return redirect(url_for('gn_home'))
+        else:
+            flash(f'Authentication Error  user', 'danger')
+            return render_template("login.html", form=form)
+    
     if username not in all_users:
         flash(f'Invalid  user', 'danger')
         return render_template("login.html", form=form)
