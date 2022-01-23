@@ -1,4 +1,4 @@
-import userdb
+from . import userdb
 from flask_login import UserMixin
 
 
