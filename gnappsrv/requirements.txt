@@ -10,6 +10,7 @@ numpy
 pandas
 psutil
 pyyaml
+requests
 sqlparse
 sqlalchemy
 tinydb
