@@ -1,0 +1,29 @@
+ARG IMAGE_VARIANT=slim-buster
+ARG OPENJDK_VERSION=8
+ARG PYTHON_VERSION=3.9.5
+
+FROM python:${PYTHON_VERSION}-${IMAGE_VARIANT} AS py3
+FROM openjdk:${OPENJDK_VERSION}-${IMAGE_VARIANT}
+
+LABEL maintainer="gnanapath project"
+COPY --from=py3 / /
+
+ARG PYSPARK_VERSION=3.1.2
+RUN pip --no-cache-dir install pyspark==${PYSPARK_VERSION}
+
+LABEL maintainer="gnanapath project"
+EXPOSE 5050
+EXPOSE 4040
+USER root
+
+RUN apt-get update \
+    && apt-get -y install libpq-dev gcc \
+    && pip install psycopg2
+
+WORKDIR /opt/GnanaPath
+COPY startgnpath.sh startgnpath.sh
+COPY gnappsrv/requirements.txt requirements.txt
+RUN pip install -r requirements.txt
+WORKDIR /opt/GnanaPath
+
+CMD ["/bin/bash", "startgnpath.sh"]
