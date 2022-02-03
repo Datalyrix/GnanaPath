@@ -1,7 +1,7 @@
 ####################################################################
 # GnanaWarehouse_DB module does following tasks
 #    - Add meta relationships
-#    - Add meta attributes to node to neo4j
+#    - Add meta attributes to metanodes
 ###################################################################
 
 import os
