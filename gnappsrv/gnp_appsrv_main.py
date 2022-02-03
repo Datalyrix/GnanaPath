@@ -35,11 +35,13 @@ sys.path.append(listDir)
 from gnutils.gn_log import gn_log, gn_log_err
 from gn_config import gn_config_init, GNGraphConfigModel, GNGraphDBConfigModel, gn_pgresdb_getconfiguration
 
-from gndatadis.gndd_filedb_ops import gndd_filedb_insert_file_api, gndd_filedb_filelist_get
+from gndatadis.gndd_filedb_ops import gndd_filedb_insert_file_api, gndd_filedb_filelist_get, gndd_filedb_fileinfo_bynode, gndd_filedb_filestate_set
+
 
 from gngraph.search  import gngraph_search_client
 from gngraph.ingest.gngraph_ingest_pd import gngraph_ingest_file_api
-
+from gngraph.gngraph_dbops.gngraph_pgresdbops import GNGraphPgresDBOps
+from gngraph.gngraph_dbops.gngraph_pgres_dbmgmtops import GNGraphPgresDBMgmtOps
 
 # Append system path
 
@@ -128,6 +130,7 @@ def upload_file():
         flen = len(fres)
         ###fres_table = GNFileLogResults(items=fres)
         return render_template('upload.html', disp_srch=_srch, file_res=fres, flen=flen)
+    
     if request.method == 'POST':
 
         if 'fd' not in request.files:
@@ -135,53 +138,62 @@ def upload_file():
             return redirect(request.url)
 
         files = request.files["fd"]
-        fdesc = request.form["fdesc"];
-        ftype = request.form["ftype"];
-        fdelim = request.form['fdelim'];
-
+        fdesc = request.form["fdesc"]
+        ftype = request.form["ftype"]
+        fdelim = request.form["fdelim"]
+        fbizdomain = request.form["bizdomain"]
+        fnodename = request.form["nnameid"]
+        
         if 'ingest_mode' in request.form:
-            fingest = request.form['ingest_mode'];
+            fingest = request.form['ingest_mode']
         else:
             fingest = 'off'
-        if 'dataset_name' in request.form:
-            datasetname = request.form['dataset_name']
-            print(' Dataset name '+datasetname)
-        else:
-            datasetname = ''
+            
+        ##if 'dataset_name' in request.form:
+        ##    datasetname = request.form['dataset_name']
+        ##    print(' Dataset name '+datasetname)
+        ##else:
+        ##    datasetname = ''
 
-        bizdomain = request.form['bizdomain']
+        ###bizdomain = request.form['bizdomain']
+            
         
         if not allowed_file(files.filename):
             flash('Please upload CSV or JSON file', 'danger')
             return redirect(request.url)
         elif files and allowed_file(files.filename):
             fname = secure_filename(files.filename)
-            file_name,file_ext=fname.split(".")
-            filename= re.sub(r'\W+','',file_name)+f'.{file_ext}'
+            file_name, file_ext = fname.split(".")
+            filename= re.sub(r'\W+','', file_name)+f".{file_ext}"
+            ####nodename, fext = filename.split(".")
+            print('GnAppServ: file name '+filename+"   filenode: "+file_name)    
             files.save(os.path.join(app.config['gnUploadsFolder'], filename))
-            gn_log('GNAppServer: uploaded file '+filename+ ' successfully ')
-            
+            gn_log("GnAppServ: uploaded file "+filename+" successfully ")
+            if fnodename == "":
+                fnodename = file_name
+
+            if fbizdomain == "select":
+               fbizdomain="other"
             ### For timebeing disable csv file upload
             ###gndwdbDataUpload(app.config['gnUploadsFolder'], filename)
             ###fdelim = ','
             fp = Path(app.config['gnUploadsFolder']+"/"+filename)
             fsize = fp.stat().st_size
-            gndd_filedb_insert_file_api(filename, fsize, ftype, bizdomain, fdesc, fdelim, app.config["gnCfgDBFolder"])
-            fres = gndd_filedb_filelist_get(app.config["gnCfgDBFolder"]);
+            gndd_filedb_insert_file_api(filename, fsize, ftype, fbizdomain, fdesc, fdelim, fnodename, app.config["gnCfgDBFolder"])
+            fres = gndd_filedb_filelist_get(app.config["gnCfgDBFolder"])
             flen = len(fres)
-            #print(fres_table)
-            ##fres_table = GNFileLogResults(items=fres)
+            
             if (fingest == 'on'):
-
-                print(' File ingest is on ')
-                if (datasetname == ''):
-                    nodename, fext = filename.split(".")
-                    gn_log(' Getting node name '+nodename)
-                else:
-                    nodename = datasetname
-                gn_log('GNAppSrv: Ingest file '+nodename+ ' Business  Domain '+bizdomain)    
-                gngraph_ingest_file_api(filename, ftype, fdelim, nodename, bizdomain, app.config["gnDataFolder"], app.config["gnGraphDBCredsFolder"], app.config["gnCfgSettings"])
-                gn_log('GnAppSrv: Uploaded new file. Remap metarepo ')
+                gn_log('GnAppServ: File ingestion is on ')
+                #if (datasetname == ''):
+                #    nodename, fext = filename.split(".")
+                #    gn_log(' Getting node name '+nodename)
+                #else:
+                #    nodename = datasetname
+                gn_log('GNAppSrv: Ingest file '+fnodename+ ' Business  Domain '+fbizdomain)    
+                gngraph_ingest_file_api(filename, ftype, fdelim, fnodename, fbizdomain, app.config["gnDataFolder"], app.config["gnGraphDBCredsFolder"], app.config["gnCfgSettings"])
+                
+                gn_log('GnAppServ: Uploaded new file. Remap metarepo ')
                 res = gngraph_search_client.gnsrch_meta_remap_request()
                 
         flash(f'File {filename} successfully uploaded', 'success')
@@ -630,6 +642,57 @@ def gn_log_stream():
             ##    time.sleep(10)
         return content    
     return app.response_class(generate(), mimetype='text/plain')
+
+
+@app.route('/api/v1/ingnode', methods=['GET'])
+@login_required
+def  ingest_node_intodb():
+
+    nodename= ''
+
+    if 'node' in request.args:
+        nodename = request.args['node']
+
+    if (nodename == ''):
+        print('GnAppSrv: Ingest node with: Invalid args ')
+        rjson = {
+            "status": "FAIL",
+            "statusmsg": "Invalid node name ",
+            }
+        return jsonify(rjson)
+    
+    print('GnAppSrv: Ingesting node '+nodename+' into graphdb ')
+
+
+    fres = gndd_filedb_fileinfo_bynode(nodename,app.config["gnCfgDBFolder"])
+
+    if not bool(fres):
+        print('GnAppSrv: Ingest node with: Invalid file ')
+        rjson = {
+            "status": "FAIL",
+            "statusmsg": "Invalid node file ",
+            }
+        return jsonify(rjson)
+        
+    
+    print('Filelog ')
+    print(fres)
+    gngraph_ingest_file_api(fres["filename"], fres["filetype"], fres["filedelim"], nodename, fres["bizdomain"], app.config["gnDataFolder"], app.config["gnGraphDBCredsFolder"], app.config["gnCfgSettings"])
+
+    print('GnAppSrv: Node '+nodename+' is ingested ')
+    ### Set the state 
+    gndd_filedb_filestate_set(nodename, "INGESTED", app.config["gnCfgDBFolder"])
+                            
+    
+    gn_log('GnAppSrv: Uploaded new node. Remap metarepo ')
+    res = gngraph_search_client.gnsrch_meta_remap_request()
+    
+    rjson = {
+        "status": "SUCCESS",
+        "statusmsg": "Ingested node into database ",
+        "node": nodename
+    }
+    return rjson
 
 if __name__ == '__main__':
     
