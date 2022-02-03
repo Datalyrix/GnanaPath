@@ -18,7 +18,7 @@ from gngraph.config.gngraph_config import GNGraphConfig
 from gngraph.gngraph_dbops.gngraph_pgresdbops import GNGraphPgresDBOps
 from gngraph.gngraph_dbops.gngraph_staticfileops import GNGraphStaticFileOps
 from gnutils.gn_log import gn_log, gn_log_err
-
+from gnappsrv.gn_config import gn_pgresdb_getconfiguration
 
 class     GNGraphIngestOps:
 
@@ -27,12 +27,20 @@ class     GNGraphIngestOps:
         self.__fargs = fileargs
         self.__gdbargs = gdbargs
         if (self.__fargs["ftype"] == "csv"):
-            #try:
-            self.__nodeDF = pds.read_csv(self.__fargs["fpath"], delimiter=self.__fargs["fdelim"])
-            #except Exception as err:
-            #    print(err)
-            gn_log('GNIngest: file is parsed and created dataframe')
+            try:
+                 self.__nodeDF = pds.read_csv(self.__fargs["fpath"], delimiter=self.__fargs["fdelim"])
+            except Exception as err:
+                 print(err)
+            gn_log('GnIngPdOps: csv file '+self.__fargs["fpath"]+' is parsed and created dataframe')
 
+        if (self.__fargs["ftype"] == "json"):
+            try:
+                self.__nodeDF = pds.read_json(self.__fargs["fpath"])
+            except Exception as err:
+                print(err)
+            gn_log('GnIngPdOps: json file '+self.__fargs["fpath"]+' is parsed and created dataframe')    
+ 
+            
         ### Establish metadb conn and datadb conn    
         if (self.__gdbargs["gdbflag"]):
             self.gdb_conn_setup()
@@ -40,6 +48,7 @@ class     GNGraphIngestOps:
         if (self.__gdbargs["staticfiles"]):
             gngraph_folder = self.__gdbargs["gndatafolder"]+"/gngraph";
             self.__gngrp_sfops = GNGraphStaticFileOps(gngraph_folder)
+            
             
         ## get config class
         if (self.__gdbargs["gndatafolder"]):
@@ -57,13 +66,14 @@ class     GNGraphIngestOps:
 
         ###with open(self.__gdbargs["gdbcredsfpath"], encoding="utf-8") as fh:
         ###     gdb_creds = json.load(fh)
-        gdb_creds = gn_pgresdb_getconfiguration(self.__gdbargs["gdbcredsfpath"])        
-        self.__gdbMetaDBConnp = GNGraphPgresDBOps.from_args(gdb_creds["dbserver"], gdb_creds["dbport"], gdb_creds["dbuser"], gdb_creds["dbpasswd"], self.__gdbargs["gnmetaDB"], "gnmetadb")         
-        self.__gdbDataDBConnp = GNGraphPgresDBOps.from_args(gdb_creds["dbserver"], gdb_creds["dbport"], gdb_creds["dbuser"], gdb_creds["dbpasswd"],  self.__gdbargs["gndataDB"], "gndatadb")
-
+        gdb_creds = gn_pgresdb_getconfiguration(self.__gdbargs["gdbcredsfolder"])        
+        self.__gdbDBConnp = GNGraphPgresDBOps.from_args(gdb_creds["serverIP"], gdb_creds["serverPort"], gdb_creds["username"], gdb_creds["password"], gdb_creds["dbname"], "gnmetadb")         
+        ####self.__gdbDataDBConnp = GNGraphPgresDBOps.from_args(gdb_creds["dbserver"], gdb_creds["dbport"], gdb_creds["dbuser"], gdb_creds["dbpasswd"],  self.__gdbargs["gndataDB"], "gndatadb")
+        
+        
     def     get_metanodeid_byname(name):
         if (self.__gdbargs["gdbflag"]):
-            gn_node_id = self.__gdbMetaDBConnp.get_metanode_id(name)
+            gn_node_id = self.__gdbDBConnp.get_metanode_id(name)
             return gn_node_id
         if (self.__gdbargs["staticfiles"]):
             gn_node_id = self.__gngrp_sfops.get_metanode_id(name)
@@ -74,7 +84,7 @@ class     GNGraphIngestOps:
         return self.gnnodeparentid
         
     def    create_node_metanodes_edges(self):
-        gn_log("GNGraphIngestOps: "+self.__fargs["nodename"]+" creating meta nodes and edges ")
+        gn_log("GnIngPdOps: "+self.__fargs["nodename"]+" creating meta nodes and edges ")
         ##### Add new metanode and metanode attributes to metaDF
         metanodeprop = {"gnlabel": self.__fargs["nodename"], "bizdomain": self.__fargs["bizdomain"]}
         metanodepropstr = json.dumps(metanodeprop)
@@ -120,11 +130,11 @@ class     GNGraphIngestOps:
         self.__metaedgeDF = pds.DataFrame(medgeattr_arr, columns=self.__metaedge_columns)
 
         ### Now write metanodes and edges to db and static files
-        if (self.__gdbargs["gdbflag"]):
-           self.__gdbMetaDBConnp.metadb_nodes_write(self.__metanodeDF)
-           self.__gdbMetaDBConnp.metadb_edges_write(self.__metaedgeDF)
+        if (self.__gdbargs["dbmode"] == 1):
+           self.__gdbDBConnp.metadb_nodes_write(self.__metanodeDF)
+           self.__gdbDBConnp.metadb_edges_write(self.__metaedgeDF)
 
-        if (self.__gdbargs["staticfiles"]):
+        if (self.__gdbargs["sfmode"] == 1):
            print("gnGraphIngest: write nodes and edges to static files ") 
            self.__metanodeDF["uptmstmp"] = self.__metanodeDF["uptmstmp"].astype(str)
            self.__metaedgeDF["uptmstmp"] = self.__metaedgeDF["uptmstmp"].astype(str)
@@ -134,11 +144,11 @@ class     GNGraphIngestOps:
         #### Update nodeidmax and edgeidmax
         self.__gngrp_cfg.save_nodeid_max(gn_nodeid_c)
         self.__gngrp_cfg.save_edgeid_max(gn_edgeid_c)
-        gn_log("GNGraphIngestOps: "+self.__fargs["nodename"]+" meta nodes and edges created successfully ")
+        gn_log("GnIngPdOps: "+self.__fargs["nodename"]+" meta nodes and edges created successfully ")
          
     def   create_node_datanodes_edges(self):
 
-         gn_log("GNGraphIngestOps: "+self.__fargs["nodename"]+" creating data nodes and edges ")
+         gn_log("GnIngPdOps: "+self.__fargs["nodename"]+" creating data nodes and edges ")
          gn_node_parent_id = self.get_metanode_parent_id()
          gn_nodeid_max_c = self.__gngrp_cfg.get_nodeid_max()
          gn_edgeid_max_c = self.__gngrp_cfg.get_edgeid_max()
@@ -171,17 +181,17 @@ class     GNGraphIngestOps:
          
          ##self.__gnmdatanodeDF
          
-         if (self.__gdbargs["gdbflag"]):
-             self.__gdbDataDBConnp.create_gndata_datatable(self.__fargs["bizdomain"], self.__fargs["nodename"])
+         if (self.__gdbargs["dbmode"] == 1):
+             self.__gdbDBConnp.grphdb_create_table(self.__fargs["nodename"], self.__fargs["bizdomain"])
          
-         if (self.__gdbargs["staticfiles"]):
+         if (self.__gdbargs["sfmode"] == 1):
              self.__gngrp_sfops.create_gndata_datadirs(self.__fargs["bizdomain"], self.__fargs["nodename"])
 
          ### Now write datanodes to domain schema table
-         if (self.__gdbargs["gdbflag"]):
-             self.__gdbDataDBConnp.datadb_nodes_write(self.__gndatanodeDF, self.__fargs["bizdomain"], self.__fargs["nodename"])
+         if (self.__gdbargs["dbmode"] == 1):
+             self.__gdbDBConnp.datadb_nodes_write(self.__gndatanodeDF, self.__fargs["bizdomain"], self.__fargs["nodename"])
 
-         if (self.__gdbargs["staticfiles"]):
+         if (self.__gdbargs["sfmode"] == 1):
              # for static files timestamp has to be JSON serializable
              self.__gndatanodeDF["uptmstmp"] = self.__gndatanodeDF["uptmstmp"].astype(str)
              self.__gngrp_sfops.datadb_nodes_write(self.__gndatanodeDF, self.__fargs["bizdomain"], self.__fargs["nodename"])
@@ -201,9 +211,9 @@ class     GNGraphIngestOps:
 
          
          ###################### Write datanodes to metatable
-         if (self.__gdbargs["gdbflag"]):
-             self.__gdbMetaDBConnp.metadb_nodes_write(self.__gnMetaDatanodeDF)
-         if (self.__gdbargs["staticfiles"]):
+         if (self.__gdbargs["dbmode"] == 1):
+             self.__gdbDBConnp.metadb_nodes_write(self.__gnMetaDatanodeDF)
+         if (self.__gdbargs["sfmode"] == 1):
              self.__gngrp_sfops.metadb_nodes_append_write(self.__gnMetaDatanodeDF)
              
 
@@ -231,9 +241,9 @@ class     GNGraphIngestOps:
          #####Select edgenode columns and prepare for write
          self.__gndatanodeEdgeDF = self.__nodeEdgeDF[["gnedgeid","gnedgename","gnedgetype","gnsrcnodeid","gntgtnodeid","gnedgeprop", "uptmstmp"]]
          ## write edges to database
-         if (self.__gdbargs["gdbflag"]):
-             self.__gdbMetaDBConnp.metadb_edges_write(self.__gndatanodeEdgeDF)
-         if (self.__gdbargs["staticfiles"]):
+         if (self.__gdbargs["dbmode"] == 1):
+             self.__gdbDBConnp.metadb_edges_write(self.__gndatanodeEdgeDF)
+         if (self.__gdbargs["sfmode"] == 1):
              self.__gndatanodeEdgeDF["uptmstmp"] = self.__gndatanodeEdgeDF["uptmstmp"].astype(str)
              self.__gngrp_sfops.metadb_edges_append_write(self.__gndatanodeEdgeDF)
              
@@ -241,7 +251,7 @@ class     GNGraphIngestOps:
          gn_edgeid_max_n = self.__gndatanodeEdgeDF.shape[0]+gn_edgeid_c-1
          self.__gngrp_cfg.save_edgeid_max(gn_edgeid_max_n)
          
-         gn_log("GNGraphIngestOps: "+self.__fargs["nodename"]+" data nodes and edges created succesfully")
+         gn_log("GnIngPdOps: "+self.__fargs["nodename"]+" data nodes and edges created succesfully")
          
 
 def     gngraph_ingest_file_api(filename, ftype, fdelim, nodename, bizdomain, gndata_folder, gngraph_creds_folder, gncfg_settings):
@@ -264,12 +274,17 @@ def     gngraph_ingest_file_api(filename, ftype, fdelim, nodename, bizdomain, gn
     gdbargs["gdb"] = "pgres"
     gdbargs["gdbflag"] = gncfg_settings["dbmode"]
     gdbargs["gdbcredsfpath"] = gdb_creds_filepath
+    gdbargs["gdbcredsfolder"] = gngraph_creds_folder
     gdbargs["gnmetaDB"] = "gngraph_db"
     gdbargs["gndataDB"] = "gngraph_db"
-    gdbargs["staticfiles"] = 1
+    gdbargs["staticfiles"] = gncfg_settings["sfmode"]
     gdbargs["staticfpath"] = gndata_folder+"/uploads";
     gdbargs["gndatafolder"] = gndata_folder
-        
+
+    gdbargs["sfmode"] = gncfg_settings["sfmode"]
+    gdbargs["dbmode"] = gncfg_settings["dbmode"]
+    
+    
     gnIngestp = GNGraphIngestOps(fileargs, gdbargs)
 
     ## First create metanodes and metaedges 
