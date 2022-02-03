@@ -1,4 +1,5 @@
 import os
+import sys
 from os import path
 import pandas as pds
 import json
@@ -6,6 +7,18 @@ import pathlib
 from pyspark.sql.functions import from_json, col
 import psycopg2
 from sqlalchemy import create_engine
+
+
+curentDir = os.getcwd()
+parentDir = curentDir.rsplit('/', 1)[0]
+if parentDir not in sys.path:
+    sys.path.append(parentDir)
+
+gnRootDir = parentDir.rsplit('/', 1)[0]
+if gnRootDir not in sys.path:
+    sys.path.append(gnRootDir)
+
+from gnutils.gn_srch_log import gnsrch_log, gnsrch_log_err
 
 """
 gngraph db srch implementation main class and associated functions
@@ -27,18 +40,19 @@ class       GNGraphSrchPgresDBOps:
         return cls(gdb_creds["dbserver"], gdb_creds["dbport"], gdb_creds["dbuser"], gdb_creds["dbpasswd"], dbname, gdb_creds["dbtype"], spk)
 
     @classmethod
-    def from_args(cls, dbserver, dbport, dbuser, dbpasswd, spk):
-        return cls(dbserver, dbport, dbuser, dbpasswd, spk)
+    def from_args(cls, dbserver, dbport, dbuser, dbpasswd, dbname, spk):
+        return cls(dbserver, dbport, dbuser, dbpasswd, dbname, spk)
 
-    def __init__(self, dbserver, dbport, dbuser, dbpasswd, spk):
+    def __init__(self, dbserver, dbport, dbuser, dbpasswd, dbname, spk):
         
             #Create an engine instance
             self.__gdb_dbserver = dbserver
             self.__gdb_dbport = dbport
             self.__gdb_dbuser = dbuser
             self.__gdb_dbpasswd = dbpasswd
-            self.__gdb_metadb = "gngraph_db"
-            self.__gdb_datadb = "gngraph_db"
+            self.__gdb_dbname = dbname
+            ##self.__gdb_metadb = "gngraph_db"
+            ##self.__gdb_datadb = "gngraph_db"
             self.__gdb_metadb_schema = "gnmeta"
             self.__gdb_metanodes_tbl = "gnnodes"
             self.__gdb_metaedges_tbl = "gnedges"
@@ -48,13 +62,13 @@ class       GNGraphSrchPgresDBOps:
 
     def    gngrph_tblmap_dataframe(self, dbname, schema, tbl_name, spk):
 
-            print('GNPgresSrch: map tabl  dataframe')
+            gnsrch_log('GnSrchPgresDBOps: map node tabl to  dataframe')
             db_connstr = "jdbc:postgresql://"+self.__gdb_dbserver+":"+self.__gdb_dbport+"/"+dbname
-            node_tbl = schema+"."+tbl_name
+            node_tbl = schema+'."'+tbl_name+'"'
             ###datadb_connstr = "jdbc:postgresql://"+self.__gdb_dbserver+":"+self.__gdb_dbport+"/"+self.__gdb_datadb
 
-            print('GNPgresSrchOps:    dbconnstr:'+db_connstr)
-            print('GNPgresSrchOps:    node_tbl '+node_tbl)
+            gnsrch_log('GnSrchPgresDBOps:    dbconnstr:'+db_connstr)
+            gnsrch_log('GnSrchPgresDBOps:    node_tbl '+node_tbl)
 
             try:
                 retDF = spk.read \
@@ -69,9 +83,9 @@ class       GNGraphSrchPgresDBOps:
                 dnodeDF = self.datanode_flatten_jsonfields(retDF, spk)
                 
                 retDF.createOrReplaceTempView(tbl_name)
-                print('GNPgresSrchOps: '+tbl_name+' mapped dataframe');
+                print('GnSrchPgresDBOps: '+tbl_name+' mapped dataframe');
             except Exception as error :
-                print('GNPgresSrchOps: ERROR failed')
+                print('GnSrchPgresDBOps: ERROR failed')
                 print(error)
                 retDF = None
                 
@@ -82,13 +96,10 @@ class       GNGraphSrchPgresDBOps:
             
     def    gnmetanodes_map_dataframe(self, spk):        
 
-            print('GNPgresSrch: map metanode dataframe')
-            metadb_connstr = "jdbc:postgresql://"+self.__gdb_dbserver+":"+self.__gdb_dbport+"/"+self.__gdb_metadb            
+            gnsrch_log('GnSrchPgresDBOps: map metanode dataframe')
+            metadb_connstr = "jdbc:postgresql://"+self.__gdb_dbserver+":"+self.__gdb_dbport+"/"+self.__gdb_dbname            
             metanode_tbl = self.__gdb_metadb_schema+"."+self.__gdb_metanodes_tbl            
-            datadb_connstr = "jdbc:postgresql://"+self.__gdb_dbserver+":"+self.__gdb_dbport+"/"+self.__gdb_datadb
-
-            ##print('GNPgresSrchOps:    metadbconnstr '+metadb_connstr)
-            ##print('GNPgresSrchOps:    metanode_tbl '+metanode_tbl)
+            datadb_connstr = "jdbc:postgresql://"+self.__gdb_dbserver+":"+self.__gdb_dbport+"/"+self.__gdb_dbname
             
             try:   
                 self.__gnmetaNodeDF = spk.read \
@@ -101,20 +112,20 @@ class       GNGraphSrchPgresDBOps:
                                        .load()
                 ####self.__gnmetaNodeDF.show(2)
                 self.__gnmetaNodeDF.createOrReplaceTempView("gnmetanodes")
-                print('GNPgresSrchOps: mapped dataframe COMPLETED ');
+                gnsrch_log('GnSrchPgresDbOps: mapped dataframe COMPLETED ');
             except Exception as error :
-                print('GNPgresSrchOps: ERROR failed')
-                print(error)
+                gnsrch_log('GnSrchPgresDbOps: ERROR failed')
+                gnsrch_log(error)
                 self.__gnmetaNodeDF = None
 
 
     def    gnmetaedges_map_df(self, spk):
 
-            print('GNPgresSrch: map metaedges dataframe')
-            metadb_connstr = "jdbc:postgresql://"+self.__gdb_dbserver+":"+self.__gdb_dbport+"/"+self.__gdb_metadb
+            gnsrch_log('GnSrchPgresDBOps: map metaedges dataframe')
+            metadb_connstr = "jdbc:postgresql://"+self.__gdb_dbserver+":"+self.__gdb_dbport+"/"+self.__gdb_dbname
             metaedge_tbl = self.__gdb_metadb_schema+"."+self.__gdb_metaedges_tbl
             ###datadb_connstr = "jdbc:postgresql://"+self.__gdb_dbserver+":"+self.__gdb_dbport+"/"+self.__gdb_datadb
-            print('GNPgresSrch: connecting PGres: '+metaedge_tbl)
+            gnsrch_log('GnSrchPgresDBOps: connecting database table: '+metaedge_tbl)
             
             try:
                 metaEdgeDF = spk.read \
@@ -146,12 +157,12 @@ class       GNGraphSrchPgresDBOps:
 
     def    gnmetanodes_map_df(self, spk):
 
-            print('GNPgresSrchOps: map metanodes dataframe')
-            metadb_connstr = "jdbc:postgresql://"+self.__gdb_dbserver+":"+self.__gdb_dbport+"/"+self.__gdb_metadb
+            gnsrch_log('GnSrchPgresDBOps: mapping metanodes to a dataframe')
+            metadb_connstr = "jdbc:postgresql://"+self.__gdb_dbserver+":"+self.__gdb_dbport+"/"+self.__gdb_dbname
             metanodes_tbl = self.__gdb_metadb_schema+"."+self.__gdb_metanodes_tbl
             ###datadb_connstr = "jdbc:postgresql://"+self.__gdb_dbserver+":"+self.__gdb_dbport+"/"+self.__gdb_datadb
 
-            print('GNPgresSrchOps: metadb connstr: '+metanodes_tbl);
+            gnsrch_log('GnSrchPgresDBOps: metadb connstr: '+metanodes_tbl);
             try:
                 metaNodeDF = spk.read \
                                     .format("jdbc") \
@@ -219,16 +230,14 @@ class       GNGraphSrchPgresDBOps:
         ##datanodeFlattenDF = n1DF.join(n2DF, n1DF.gnnodeid==n2DF.gnnodeid, "inner")        
         return datanodeFlattenDF
 
-
-        
         
    
     def get_datanode_mapped_df(self, node_name, bizdomain, spk):
 
         # map the datanode file to spark dataframe
-        print("GNPgresSrch: map "+node_name+" domain "+bizdomain+" ")
+        gnsrch_log("GnSrchPgresDBOps: map "+node_name+" domain "+bizdomain+" ")
         
-        dnodeDF = self.gngrph_tblmap_dataframe(self.__gdb_datadb, bizdomain, node_name, spk)
+        dnodeDF = self.gngrph_tblmap_dataframe(self.__gdb_dbname, bizdomain, node_name, spk)
         
         retDF = None
         if dnodeDF is not None:
