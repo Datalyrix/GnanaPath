@@ -3,6 +3,7 @@ from os import path
 import pandas as pds
 import json
 import pathlib
+from gnutils.gn_log import gn_log, gn_log_err
 
 """
 gngraph static fileops implementation main class and associated functions
@@ -33,7 +34,15 @@ class  GNGraphStaticFileOps:
             jDF = None
             
         return jDF
-        
+    
+    def  metadb_load_metaedge_df(self):
+        if path.exists(self.gnmetaedge_filepath):
+            jDF = pds.read_json(self.gnmetaedge_filepath)
+        else:
+            jDF = None
+        return jDF
+
+    
     def  metadb_nodes_append_write(self, metaDF):
 
         if path.exists(self.gnmetanode_filepath):
@@ -91,13 +100,10 @@ class  GNGraphStaticFileOps:
 
           metaDF = pds.read_json(self.gnmetanode_filepath)
           metaDF.head(2)
-          print('gngrpStaticFileOps: getting metanode: '+self.gnmetanode_filepath)
+          gn_log("GnGrphSfOps: getting metanode: "+self.gnmetanode_filepath)
           
           rDF = metaDF.query('gnnodename == "'+name+'"')
-          ##nres = rDF["gnnodeid"].count()
-          ##if (nres > 0):
 
-          print('gngrpStaticFileOps: Getting metanode id '+name)
           if (rDF.shape[0] > 0):
               for x in rDF["gnnodeid"]:
                   gnnode_id = x
@@ -116,7 +122,25 @@ class  GNGraphStaticFileOps:
          if not os.path.exists(dnode_dir):
              os.makedirs(dnode_dir)
 
+    def  datadb_load_metanode_df(self, bizdomain, nodename):
 
+        bizdomain_dir = self.gndata_graph_data_folder+"/"+bizdomain
+
+        if not os.path.exists(bizdomain_dir):
+            gn_log("GnGrphSfOps: biz domain "+bizdomain+" directory is not present")
+            return None
+
+        dnode_dir = bizdomain_dir+"/"+nodename
+        dnode_file = dnode_dir+"/"+nodename+".json"
+
+        gn_log("GnGrphSfOps: reading datanode file "+dnode_file)
+        if path.exists(dnode_file):
+            jDF = pds.read_json(dnode_file)
+        else:
+            jDF = None
+            
+        return jDF
+             
 
     def  datadb_nodes_write(self, dataNodeDF, bizdomain, nodename):
 
@@ -155,8 +179,6 @@ class  GNGraphStaticFileOps:
            ###nres = rDF["gnnodeid"].count()
            if (rDF.shape[0] > 0):
               for x in rDF["gnrelid"]:
-                  ##print(' parsing x '+str(x))
-                  ##relid = rDF["gnnodeid"][0]
                   relid = x
            else:
                relid = -1

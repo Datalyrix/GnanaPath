@@ -38,6 +38,7 @@ from gngraph.gngraph_dbops.gngraph_pgresdbops_srch import GNGraphSrchPgresDBOps
 from gngraph.gngraph_dbops.gngraph_staticfileops_srch import GNGraphSrchStaticFileOps
 from gngraph.search.gngraph_sqlparser import GNGraphSqlParserOps
 from gnutils.gn_srch_log import gnsrch_log, gnsrch_log_err, gnsrch_logging_init
+from gnappsrv.gn_config  import gn_pgresdb_getconfiguration
 
 """
  Enable search related logs 
@@ -82,6 +83,7 @@ class     GNGraphSearchOps:
         self.__gnmetaNodesList = []
         gnsrch_log('GnSrchOps: ########### SearchOps Init ##############')
         self.gngraph_config_init(gngrp_datadir, accessmode, fargs, dbargs)
+        gnsrch_log("GnSrchOps: ### Search configuration complete default mode "+self.__gncfg_readmode)
         self.gngraph_meta_nodes_edges_setup()
         gnsrch_log("GnSrchOps:  ####Search Initialization complete SUCCESS #### ")
 
@@ -115,15 +117,25 @@ class     GNGraphSearchOps:
           self.__gngrp_sfops = GNGraphSrchStaticFileOps(self.__gncfg["gngraph_root_dir"], self.__spark)
           self.meta_edge_filepath = self.__gncfg_fargs["gngraph_data_dir"]+"/"+self.__gncfg_fargs["gngraph_edge_filename"]
           self.meta_node_filepath = self.__gncfg_fargs["gngraph_data_dir"]+"/"+self.__gncfg_fargs["gngraph_node_filename"]
-
           
        if (self.__gncfg_accessmode['dbmode'] == 1):
             self.__gncfg_dbargs = dbargs
-            with open(self.__gncfg_dbargs["gdbcredsfpath"], encoding="utf-8") as fh:
-                gdb_creds = json.load(fh)           
-            self.__gngrp_dbops = GNGraphSrchPgresDBOps.from_args(gdb_creds["dbserver"], gdb_creds["dbport"], gdb_creds["dbuser"], gdb_creds["dbpasswd"], self.__spark)
+            ##with open(self.__gncfg_dbargs["gdbcredsfpath"], encoding="utf-8") as fh:
+            #    gdb_creds = json.load(fh)
+            gdb_creds = gn_pgresdb_getconfiguration(self.__gncfg_dbargs["gdbcredsfpath"])
             
-              
+            gnsrch_log('GnSrchOps: reading dbmode creds from '+self.__gncfg_dbargs["gdbcredsfpath"])
+            print(gdb_creds)
+            self.__gngrp_dbops = GNGraphSrchPgresDBOps.from_args(gdb_creds["serverIP"], gdb_creds["serverPort"], gdb_creds["username"], gdb_creds["password"], gdb_creds["dbname"], self.__spark)
+       print(' access mode ')
+       print(self.__gncfg_accessmode)
+       if self.__gncfg_accessmode['dbmode'] == 1:
+           self.__gncfg_readmode = 'dbmode'
+       ##elif self.__gncfg_accessmode['sfmode'] == 1:
+       else:
+           self.__gncfg_readmode = 'sfmode'
+       print(' read mode is set '+self.__gncfg_readmode)
+            
     
     def    gngraph_cfgdata_write(self):
        cfgfpath = self.__gncfg["gngraph_cfg_dir"]+"/"+self.__gncfg["gngraph_cfg_filename"]
@@ -194,9 +206,9 @@ class     GNGraphSearchOps:
     # write/update the meta node data to gnmeta[filename]node.json
     def   get_metanode_info(self, ent_name):
 
-        if (self.__gncfg_accessmode["dbmode"] == 1):
+        if  self.__gncfg_readmode == "dbmode":
             metanode_jobj = self.__gngrp_dbops.get_metanode_info(ent_name, self.__spark) 
-        elif (self.__gncfg_accessmode["sfmode"] == 1):
+        elif self.__gncfg_readmode == "sfmode":
            metanode_jobj = self.__gngrp_sfops.get_metanode_info(ent_name, self.__spark)
         else:
            metanode_jobj = {}
@@ -206,9 +218,9 @@ class     GNGraphSearchOps:
     
     def    get_datanode_mapped_df(self, node_name, bizdomain):
 
-         if (self.__gncfg_accessmode["dbmode"] == 1):
+         if self.__gncfg_readmode == "dbmode":
              dnodeDF = self.__gngrp_dbops.get_datanode_mapped_df(node_name, bizdomain, self.__spark)                
-         elif (self.__gncfg_accessmode["sfmode"] == 1):
+         elif self.__gncfg_readmode == "sfmode":
              dnodeDF = self.__gngrp_sfops.get_datanode_mapped_df(node_name, bizdomain, self.__spark)             
          else:
             dnodeDF = None
@@ -218,38 +230,36 @@ class     GNGraphSearchOps:
 
     def    get_metaedges_mapped_df(self):
 
-        if (self.__gncfg_accessmode["dbmode"] == 1):
+        if self.__gncfg_readmode == "dbmode":
             self.__gnmetaEdgesDF_cached = self.__gngrp_dbops.gnmetaedges_map_df(self.__spark)             
-        elif (self.__gncfg_accessmode["sfmode"] == 1):
+        elif self.__gncfg_readmode == "sfmode":
             self.__gnmetaEdgesDF_cached = self.__gngrp_sfops.gnmetaedges_map_df(self.__spark)
         else:
             self.__gnmetaEdgesDF_cached = None
 
         if (self.__gnmetaEdgesDF_cached is None):
-            gnsrch_log('GNGrphSrchOps: metaEdgeDF is not mapped ')
+            gnsrch_log("GnGrphSrchOps:"+self.__gncfg_readmode+" meta edges are  not mapped ")
             self.__init_meta = 0
         else:
-            gnsrch_log('GNGrphSrchOps: metaEdgeDF is mapped ')
+            gnsrch_log("GnGrphSrchOps:"+self.__gncfg_readmode+" meta edges are mapped ")
             self.__init_meta = 1
-
         return
-
 
      
     def    get_metanodes_mapped_df(self):
 
-        if (self.__gncfg_accessmode["dbmode"] == 1):
+        if self.__gncfg_readmode == "dbmode":
              self.__gnmetaNodesDF_cached = self.__gngrp_dbops.gnmetanodes_map_df(self.__spark)             
-        elif (self.__gncfg_accessmode["sfmode"] == 1):
+        elif self.__gncfg_readmode == "sfmode":
              self.__gnmetaNodesDF_cached = self.__gngrp_sfops.gnmetanodes_map_df(self.__spark)
         else:
             self.__gnmetaNodesDF_cached = None
 
         if (self.__gnmetaNodesDF_cached is None):
-            gnsrch_log("GNGrphSrchOps: metaNodesDF is not mapped")
+            gnsrch_log("GnGrphSrchOps: metaNodesDF is not mapped")
             self.__init_meta = 0
         else:
-            gnsrch_log("GNGrphSrchOps: metaNodesDF is mapped")
+            gnsrch_log("GnSrchOps:"+self.__gncfg_readmode+" metanodes are mapped ")
             self.__init_meta = 1
         return
 
@@ -260,7 +270,7 @@ class     GNGraphSearchOps:
     def      map_gnmeta_nodes_edges(self):
 
         self.__gnmetaNodesList = []
-        gnsrch_log('GnSrchOps: Map and cache gnmeta nodes and edges ')
+        gnsrch_log('GnSrchOps: map and cache gnmeta nodes and edges ')
         sqlst = "select * from gnmetanodes WHERE gnnodetype='GNMetaNode' OR gnnodetype='GNMetaNodeAttr'"
 
         (resNodesDF, nJson, status) = self.gngraph_execute_sqlqry(sqlst)
@@ -406,7 +416,7 @@ class     GNGraphSearchOps:
         return (0, msg, self.__sql_formatted)
 
     def    gngraph_meta_nodes_edges_setup(self):
-
+        gnsrch_log('GnSrchOps: mapping meta nodes and edges setup ')
         self.get_metanodes_mapped_df()
         self.get_metaedges_mapped_df()
         self.map_gnmeta_nodes_edges() 
@@ -630,9 +640,12 @@ def       gngraph_init(rootDir):
 def        gngrph_search_init(gnp_spark, gndata_folder, gngraph_creds_folder, accessmode):
 
 
-        gnsrch_log('GnSrchOps: ####################### Searching initialization ##############')
-        gnsrch_log('GnSrchOps: Init SearchOps using spark session ')
-        gdb_creds_filepath=gngraph_creds_folder+"/gngraph_pgres_dbcreds.json"
+        gnsrch_log('GnSrchOps: ####################### searching initialization ##############')
+        gnsrch_log('GnSrchOps: init searchOps using spark session ')
+        
+        gdb_creds_filepath=gngraph_creds_folder
+        ###+"/gngraph_pgres_dbcreds.json"
+        
         fileargs = {}
         gdbargs = {}
         gdbargs["gdb"] = "pgres"
@@ -990,31 +1003,30 @@ def     gnspk_process_request_thrfn(gngrph_cls, gnp_spark, req):
             
 def     gnspk_thread_main(gnRootDir, accessmode, req_q, resp_q):
 
-    gnsrch_log('GnSrchOps: Starting Spark Session thread ')
+    gnsrch_log('GnSrchOps: starting spark session thread ')
     app_name = "gngraph"
     gndata_folder = gnRootDir+"/gndata"
     gngraph_creds_folder = gnRootDir+"/creds/gngraph"
 
-    gnsrch_log('GnSrchOpsThr: Initializing Spark Session thread ' )
-
+    gnsrch_log('GnSrchOpsThr: initializing spark session thread ' )
+    print(accessmode)
     conf = SparkConf()
     conf.set('spark.executor.memory', '4g')
     conf.set('spark.driver.memory', '4g')
     
     gnp_spark = SparkSession.builder.appName(app_name).getOrCreate()
     
-    #gnp_spark.sparkContext.setLogLevel("INFO")
+    gnp_spark.sparkContext.setLogLevel("WARN")
     
     gngrph_cls = gngrph_search_init(gnp_spark, gndata_folder, gngraph_creds_folder, accessmode)
   
-    ### Initialized Spark Session and now wait for some task
+    ### initialized spark session and now wait for some task
     while True:
-        gnsrch_log('GnSrchOps: Thread waiting for request ')
+        gnsrch_log('GnSrchOps: thread waiting for request ')
         req = req_q.get()
 
-
         if (req is None):
-            gnsrch_log('GnSrchOps: Empty request returned ')
+            gnsrch_log('GnSrchOps: empty request returned ')
             req_q.task_done()
             return
         else:
@@ -1064,17 +1076,16 @@ def       gnp_spark_thread_send_receive_task(gnspk_thr_config, tskmsg):
     return resp
 
 
-def     gnp_spark_app_server_socket(gnRootDir):
+def     gnp_spark_app_server_socket(gnRootDir, accessmode):
     
     gnsrch_log("GnSrchOps: Starting the gnspark thread application")
     app_name="gngraph"
 
-    ##gndata_folder=pparentDir+"/gndata"
-    ##gngraph_creds_folder = pparentDir+"/creds/gngraph"
-    accessmode={'sfmode': 1, 'dbmode':0 }
+    ###accessmode={'sfmode': 1, 'dbmode':0 }
+    
     gnspk_thr_cfg = gnp_spark_thread_setup(gnRootDir, accessmode)
 
-    gnsrch_log("GnSrchOps:  Starting socket server...")
+    gnsrch_log("GnSrchOps:  starting socket server...")
     
     SERVER_HOST = "0.0.0.0"
     SERVER_PORT = 4141
@@ -1085,14 +1096,12 @@ def     gnp_spark_app_server_socket(gnRootDir):
     s.bind((SERVER_HOST, SERVER_PORT))
     s.listen(10)
     
-    ##print(f"[*] Listening as {SERVER_HOST}:{SERVER_PORT}")
-    ##print("Waiting for the client to connect... ")
+    gnsrch_log(f"GnSrchOps: starting srch thres {SERVER_HOST}:{SERVER_PORT}")
 
     while True:
         
         client_sock, address = s.accept()
     
-        ##print(f"[+] {address} is connected.")
         received = client_sock.recv(BUFFER_SIZE).decode()
         gnsrch_log('GnSrchOps: received command: '+str(received))
         
@@ -1107,7 +1116,6 @@ def     gnp_spark_app_server_socket(gnRootDir):
         ###progress = tqdm.tqdm(range(filesize), f"Receiving {filename}", unit="B", unit_scale=True, unit_divisor=1024)
         # Send message 
         client_sock.sendall(resp_str.encode())
-        ##print(f" sent the response back ")
     
         #with open(filename, "wb") as f:
         #    while True:
@@ -1192,5 +1200,14 @@ if __name__ == "__main__":
  #test_metarepo_qry_fn()
  #test_datarepo_qry_fn()
  #test_spkthread_fns(pparentDir)
- gnp_spark_app_server_socket(gnRootDir)
+ nargs = len(sys.argv)
+
+ if nargs < 2:
+     sfmode = 1
+     dbmode = 0
+ else:
+     (prog, sfmode, dbmode) = sys.argv
+
+ amode = {'sfmode': int(sfmode), 'dbmode': int(dbmode)}    
+ gnp_spark_app_server_socket(gnRootDir, amode)
  print('Gngraph Search Thread exiting ')

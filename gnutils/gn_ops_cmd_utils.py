@@ -5,7 +5,6 @@ import time
 import logging
 
 ##import subprocess
-
 curentDir = os.getcwd()
 GnRootDir = curentDir.rsplit('/', 1)[0]
 if GnRootDir not in sys.path:
@@ -29,7 +28,7 @@ def   checkIfProcessRunning(processName):
        #print('Name '+str(name)+" pid "+str(pid)+"  cmdline "+cmdline)
        
        if processName in cmdline:
-           print(' '+processName+' found with pid '+str(pid)+' ')
+           ##print(' '+processName+' found with pid '+str(pid)+' ')
            return pid
     pid = 0   
     print('processName '+processName+' is not running ')   
@@ -55,14 +54,14 @@ def      GnCheckServices(gnRootDir):
     appsrvpid = checkIfProcessRunning(GNAPP_SRV)
     
     if (srchpid == 0):
-        print('Search service is not running ') 
+        print('GnSearch service is STOPPED ') 
     else:
-        print('Search is running with pid '+str(srchpid))
+        print('GnSearch is RUNNING pid '+str(srchpid))
 
     if (appsrvpid == 0):
-        print('App Service is not running ')
+        print('GnAppServer is STOPPED ')
     else:
-        print('App Service is running with pid '+str(appsrvpid))
+        print('GnAppServer is RUNNING pid '+str(appsrvpid))
         
     return(appsrvpid, srchpid)
 
@@ -71,7 +70,7 @@ def     GnServiceStart(gnRootDir, servname):
     if (servname == "gnsearch"):
         srchpid = checkIfProcessRunning(GNSRCH_APP)
         if (srchpid != 0):
-            print('GnSearch service is already running')
+            print('GnSearch is already RUNNING pid '+str(srchpid))
             return srchpid
         else:
             cm = gnRootDir+"/gngraph/search/startGNSearch.sh "+gnRootDir
@@ -81,15 +80,15 @@ def     GnServiceStart(gnRootDir, servname):
             # check if that process got killed 
             srchpid1 = checkIfProcessRunning(GNSRCH_APP)
             if (srchpid1 != 0):
-                print('GnSearch service is started succesfully ')
+                print('GnSearch is successfully RUNNING pid '+str(srchpid1))
             else:
-                print('GnSearch service failed to start ')
+                print('GnSearch is failed to start  STOPPED ')
                 return -1
                 
     if (servname == "gnappsrv"):
         srvpid = checkIfProcessRunning(GNAPP_SRV)
         if (srvpid != 0):
-            print('GnOps: GnApp Server service is already running')
+            print('GnAppServer is already RUNNING pid '+str(srvpid))
             return 0
         else:
             cm = gnRootDir+"/gnappsrv/startGNAppSrv.sh "+gnRootDir
@@ -99,9 +98,9 @@ def     GnServiceStart(gnRootDir, servname):
             # check if that process got killed 
             srchpid1 = checkIfProcessRunning(GNAPP_SRV)
             if (srchpid1 != 0):
-                print('GnOps: GnApp Server service is started succesfully ')
+                print('GnAppServer service is succesfully RUNNING pid '+str(srchpid1))
             else:
-                print('GnOps: GnApp Server service failed to start ')
+                print('GnAppServer service failed to start ')
    
                 
         
@@ -111,7 +110,7 @@ def     GnServiceStop(gnRootDir, servname):
     if (servname == "gnsearch"):
         srchpid = checkIfProcessRunning(GNSRCH_APP)
         if (srchpid == 0):
-            msg="GnOps: search service is not running"
+            msg="GnSearch service is STOPPED"
             print(msg)
             os.system('echo "`date`: '+msg+' " >> '+logFile+'  ')
             return 0
@@ -125,19 +124,19 @@ def     GnServiceStop(gnRootDir, servname):
             # check if that process got killed 
             srchpid1 = checkIfProcessRunning(GNSRCH_APP)
             if (srchpid1 == 0):
-                print('GnSearch service is stopped succesfully ')
+                print('GnSearch service is succesfully STOPPED')
             else:
-                print('GnSearch service failed to stop ')
+                print('GnSearch service failed to stop RUNNING ')
    
     if (servname == "gnappsrv"):
         srvpid = checkIfProcessRunning(GNAPP_SRV)
         if (srvpid == 0):
-            msg="GnOps: GnApp Server service is not running"
+            msg="GnAppServer service is STOPPED"
             print(msg)
             os.system('echo "`date`: '+msg+' " >> '+logFile+'  ')
             return 0
         else:
-            msg="GnOps: GnApp Server stopped the services"
+            msg="GnAppServer stopping the services"
             cm = "kill "+str(srvpid)
             #rc = subprocess.call(cm)
             rc = os.system(cm)
@@ -154,10 +153,7 @@ def     GnServiceStop(gnRootDir, servname):
                 
 if  __name__ == "__main__":
     
-    print(' Root Director '+GnRootDir)
-    ##parser = argparse.ArgumentParser()
     nargs = len(sys.argv)
-    #print('sys argc '+str(nargs))
     
     if nargs  < 2:
         print('gn_ops_cmd_utils <cmd> <servname>')

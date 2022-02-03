@@ -1,11 +1,16 @@
 {% extends "base_layout.html" %}
 {% block content %}
 <div class="content-section">
+  
   <form class="md-form" method="post" action="" enctype="multipart/form-data">
+    <div>
+      <h5> Upload Files </h5>
+    </div>
    <div class="input-group">
-      <div class="custom-file">
+     <div class="custom-file">
+        
          <input type="file" class="custom-file-input" name="fd" id="inputGroupFile01"  autocomplete="off" required aria-describedby="inputGroupFileAddon01">
-         <label class="custom-file-label" for="inputGroupFile01">Choose a CSV or JSON file</label>
+         <label class="custom-file-label" for="inputGroupFile01">Click to select a CSV or JSON file</label>
       </div>
   
     <div class="row">&nbsp;
@@ -21,99 +26,208 @@
  -->
 
 </div>
- <hr/>
-    <div class="p-2">
-      <label> File Description </label>
-      <input type="text" name="fdesc" id="fdesc"></input>
+   <hr/>
+
+ <div class="d-grid gap-5">
+   <div class="p-2 bg-light border">
+     
+    <div class="container">
+      <div class="row">
+	<div class="col-md-6">
+          <label> File Description </label>
+        </div>
+	<div class="col-md-6">  
+          <input type="text" name="fdesc" id="fdesc"></input>
+        </div>
+      </div>	  
     </div>
-    <div class="p-2">
-      <label> File type </label>
-      <select name="ftype" id="ftype">
-	<option value="csv">CSV</option>
-	<option value="json">JSON</option>
-      </select>
-    </div>
-    <div class="p-2">
-      <label> File Delimiter (applied for CSV-files only </label>
-      <select name="fdelim" id="fdelim">
-        <option value=","> ","(Comma-seperated)</option>
-        <option value="|">"|" (Pipe-seperated)</option>
-      </select>
-    </div>
-    <div class="p-2">
-      <input type="checkbox" name="ingest_mode" id="ingest_mode"> </input>
-      <label> Check to ingest data into Graph Database </label>
-      <label> During upload, the file is cached however if you want to automatically ingest data as well, please check this option </label>      
    </div>
-    <div class="p-2">
-      <select id="bizdomain" name="bizdomain">
-	<option value="sales"> Sales Domain </option>
-	<option value="product"> Product Domain </option>
-	<option value="customer"> Customer Domain </option>
-	<option value="other"> Other </option>
-     </select>
-    
+   
+
+   <div class="p-2 bg-light border">  
+    <div class="container">
+      <div class="row">
+	 <div class="col-md-6">  
+           <label> File type </label>
+         </div>
+         <div class="col-md-6">
+	   
+            <select class="browser-default custom-select" name="ftype" id="ftype">
+	        <option value="csv">CSV</option>
+	        <option value="json">JSON</option>
+            </select>
+         </div>
+       </div>  
+    </div> 
+   </div>
+  
+  <div class="p-2 bg-light border">    
+
+    <div class="container">
+      <div class="row">
+	<div class="col-6">
+            <label> File Delimiter for CSV file </label>
+	</div>
+
+	<div class="col-6">
+           <select class="browser-default custom-select" name="fdelim" id="fdelim">
+              <option value=","> ","(Comma-seperated)</option>
+              <option value="|">"|" (Pipe-seperated)</option>
+           </select>
+        </div>
+       </div>
+     </div>
+  </div>
+
+   <div class="p-2 bg-light border">    
+        <div class="container">
+           <div class="row">
+	     <div class="col-6">
+                  <label> Check to ingest data into Graph Database </label>
+                  <label> During upload, the file is cached however if you want to automatically ingest data as well, please check this option </label>              </div>  
+	     <div class="col-6">  
+                 <input type="checkbox" name="ingest_mode" id="ingest_mode"> </input>
+             </div>        
+            </div>
+         </div>
+   </div>
+   
+</div> <!--  end of grid -->  
+
+ <hr/>
+ 
+  <div class="container">
+    <div class="row">
+       <div class="col-6">
+         <select class="browser-default custom-select" id="bizdomain" name="bizdomain">
+	      <option value="select">Select Business Domain </option>
+	      <option value="sales"> Sales Domain </option>
+	      <option value="product"> Product Domain </option>
+	      <option value="customer"> Customer Domain </option>
+	      <option value="other"> Other </option>
+          </select>
+       </div>
+       <div class="col-6">
+	 <input type="text" id="nnameid" name="nnameid" placeholder="Enter nodename (Optional) "></input>
+       </div>
+    </div>
+  </div>
+       
   <br>
    <hr>
     <div class="input-group-prepend">
-        <button type="submit" class="btn btn-primary">Upload</button>
+        <button type="submit" class="btn btn-outline-primary">Upload</button>
     </div>
 
    
  </form>
 </div>
+
+<!--  Upload file History -->
+
 <div class="w-auto p-3" style="font-size:10px">
-  <form method="POST" action="">
-    <h6> Uploaded Files </h6>
+  <!-- <form method="POST" action=""> -->
+    <h6> File Upload Log </h6>
 
    
     <table class="table">
       <thead>
         <tr>
-	  <th scope="col"> fileid </th>
 	  <th scope="col"> filename </th>
-	  <th scope="col"> filetype </th>
+	  <th scope="col"> nodename </th>
 	  <th scope="col"> filedesc </th>
-	  <th scope="col"> filesize </th>
-	  <th scope="col"> Action </th>
+	  <th scope="col"> state </th>
+	  <th scope="col"> action </th>
 	</tr>
       </thead>	
       <tbody>
         {% for i in range(0, flen) %}
         <tr>
-          <th>
-	    {{ file_res[i].flid }}
-          </th>
 	  <th>
-	    {{ file_res[i].filename }}
+	    <h6>{{ file_res[i].filename }} </h6>
 	  </th>
 	  <th>
-	    {{ file_res[i].fieltype }}
+	    <h6> <span class="badge badge-primary"> {{ file_res[i].nodename }} </span> </h6>
 	  </th>
 	  <th>
-	    {{ file_res[i].filedesc }}
+	    <h6>{{ file_res[i].filedesc }}</h6>
+	    <h7> size:{{ file_res[i].filesize }} bytes </h7>
+	    <h7> Last updated:{{ file_res[i].uploadtm }} </h7>
 	  </th>
 	  <th>
-	    {{ file_res[i].filesize }}
+ 	    <label id={{"fstate"}}{{i}}>  {{ file_res[i].state }}</label>
 	  </th>
 	  <th>
- 	    {{ file_res[i].state }}
-	  </th>
+            {% if file_res[i].state == "UPLOADED" %}
+	       <input type="hidden" id="inp" value={{file_res[i].nodename}}></input>
+	       <input type="hidden" id="inp_i" value={{i}}></input>
+               <button class="btn btn-outline-primary" id="ingbtn" > Ingest </button>
+	       <!-- Bootstrap Border Spinner-->
+	       <div class="loader" id="loaderid" style="display:none"></div>
+	     
+	    {% endif %}
+	  </th>   
 	</tr>
 	
 	{% endfor %}
       </tbody>
     </table>
     
-  </form>
+  <!-- </form> -->
 </div>
 
  
 <script src="//ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
 <script type="application/javascript">
- $('input[type="file"]').change(function(e){
+
+
+
+$('input[type="file"]').change(function(e){
         var fileName = e.target.files[0].name;
         $('.custom-file-label').html(fileName);
-    });
+ });
+  
+  $('#ingbtn').on('click', function(event) {
+      var e = document.getElementById('inp').value;
+      var i = document.getElementById('inp_i').value;
+      var loader_id = document.getElementById('loaderid');
+
+      loader_id.style.display = "block";
+      this.style.display = "none";
+      var fst = document.getElementById('fstate'+i);
+
+      console.log(' Fstate '+fst.innerHTML);
+      var tvars = "node="+e;
+      var nUrl = "/api/v1/ingnode?"+tvars;
+      console.log(' showing val '+e);
+       var myHeaders = new Headers({
+            'Content-Type': 'text/plain',
+            'Access-Control-Allow-Origin' : '*'
+       });
+
+
+      try {
+
+	  return  fetch(nUrl, { method: 'GET', headers: myHeaders })
+   
+              .then (response => response.json())
+              .then (data => {
+                  var status = data.status;
+                  var node = data.node; 
+                  console.log('uploaded ingestion completed '+node);
+		  loader_id.style.display = "none"; 
+		  window.location.reload();
+		  
+  
+              });
+               
+      } catch(error) {
+          console.log('Error caught '+error);
+	  loader_id.style.display = "none"; 
+  
+      }
+  
+      
+  });
 </script>
 {% endblock content %}
