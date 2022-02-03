@@ -16,7 +16,7 @@ class FileLogSchemaModel:
         self._db = TinyDB(dbpath)
 
     def req_fields_json(self, dict_result):
-        req_items = ['flid', 'filename', 'filesize', 'filetype', 'bizdomain', 'uploadtm', 'ingesttm', 'filedesc', 'filedelim', 'fileencode', 'tags', 'state']
+        req_items = ['flid', 'filename', 'filesize', 'filetype', 'bizdomain', 'uploadtm', 'ingesttm', 'filedesc', 'filedelim', 'fileencode', 'tags', 'state', "nodename", "bizdomain"]
         return {key: value for key, value in dict_result.items()
                 if key in req_items}
 
@@ -28,7 +28,8 @@ class FileLogSchemaModel:
 
     def get_allrecs(self):
         return self._db.search(FileLogSchemaModel.query.flid > 0)
-            
+
+    
     def search_res(self, filename):
         return self._db.search(FileLogSchemaModel.query.filename == filename)
 
@@ -40,8 +41,13 @@ class FileLogSchemaModel:
         return res_info
 
     def search_file_byid(self, fileid):
-        ctentry = Query();
+        ctentry = Query()
         res_info = self._db.search(ctentry.flid.search(fileid))
+        return res_info
+
+    def search_file_bynode(self, node):
+        ctentry = Query()
+        res_info = self._db.search(ctentry.nodename.search(node))
         return res_info
     
     def get_total_recs(self):
@@ -76,14 +82,25 @@ class FileLogSchemaModel:
 
         return self._db.all()
      
+    def update_state_bynode(self, nodename, state):
+        if not self.search_file_bynode(nodename):
+            return False
+        self._db.update({'state': state
+                         },
+                        FileLogSchemaModel.query.nodename == nodename)
 
+        return True
+     
+
+
+    
     
     def stop_db(self):
         self._db.close()
 
 
 
-def   gndd_filedb_insert_file_api(fname, fsize, ftype, bizdomain, fdesc, fdelim, flogdbpath):
+def   gndd_filedb_insert_file_api(fname, fsize, ftype, bizdomain, fdesc, fdelim, fnodename, flogdbpath):
 
      # datetime object containing current date and time
      now = datetime.now()
@@ -101,10 +118,14 @@ def   gndd_filedb_insert_file_api(fname, fsize, ftype, bizdomain, fdesc, fdelim,
      req_d["uploadtm"] = dt_string
      req_d["filedesc"] = fdesc
      req_d["filedelim"] = fdelim
+     req_d["bizdomain"] = bizdomain
+     req_d["nodename"] = fnodename
      req_d["fileencode"] = "utf-8"
      req_d["tags"] = []
      req_d["state"] = "UPLOADED";
 
+     print('Save filelog ')
+     print(req_d)
      status = flogDBConnp.insert_op(req_d)
 
      if (status == "None_Insert"):
@@ -117,4 +138,21 @@ def  gndd_filedb_filelist_get(flogdbpath):
     fres = {};
     flogDBConnp = FileLogSchemaModel(flogdbpath)
     fres = flogDBConnp.get_allrecs()
+    return fres
+
+
+def gndd_filedb_fileinfo_bynode(nodename, flogdbpath):
+
+    fres = {}
+    flogDBConnp = FileLogSchemaModel(flogdbpath)
+    fres = flogDBConnp.search_file_bynode(nodename)
+    if len(fres) == 0:
+        return {}
+    return fres[0]
+
+def gndd_filedb_filestate_set(nodename, state, flogdbpath):
+
+    fres = {}
+    flogDBConnp = FileLogSchemaModel(flogdbpath)
+    fres = flogDBConnp.update_state_bynode(nodename, state)
     return fres
