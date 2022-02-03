@@ -1,6 +1,7 @@
 import psycopg2
 from sqlalchemy import create_engine, exc
 import json
+from io import StringIO
 import pandas as pds
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT # Need for CREATE DATABASE
 from psycopg2 import sql
@@ -37,27 +38,30 @@ class       GNGraphPgresDBOps:
             # Connect to PostgreSQL server
             self.dbEngine = alchemyEngine
             self.dbConnp = alchemyEngine.connect();
-            self.dbuser = dbuser
-            self.dbpasswd = dbpasswd
-            self.dbserver = dbserver
-            self.dbport = dbport
-            self.dbname = dbname
+            
+            self.__gdb_dbuser = dbuser
+            self.__gdb_dbpasswd = dbpasswd
+            self.__gdb_dbserver = dbserver
+            self.__gdb_dbport = dbport
+            self.__gdb_dbname = dbname
             self.connected = 1
             self.gnnode_table = "gnnodes"
             self.gnbizrules_table = "gnbizrules"
-            self.gnmeta_schema = "gnmeta"
-            self.gnedge_table = "gnedges"
-            self.dbtype = dbtype
+            self.__gdb_metadb_schema = "gnmeta"
+            self.__gdb_metanodes_tbl = "gnnodes"
+            self.__gdb_metaedges_tbl = "gnedges"
+            #self.dbtype = dbtype
+            
         except exc.SQLAlchemyError as err:
             self.dbConnp = None
             self.connected = 0
-            gn_log('gnPgresDBOps: unable to connect pgres DB Error ')
+            gn_log('GnIngPgresDBOps: unable to connect pgres DB Error ')
             gn_log(err)
             
         except exc.OperationalError as err:
             self.dbConnp = None
             self.connected = 0
-            gn_log('gnPgresDBOps: unable to connect pgres Operational Error ')
+            gn_log('GnIngPgresDBOps: unable to connect pgres Operational Error ')
             gn_log(err)
                                                             
       
@@ -69,8 +73,56 @@ class       GNGraphPgresDBOps:
                     conn = engine.connect()  # replace your connection
                     result = conn.execute(query)  # and retry
         return result
-                            
-            
+
+
+    def   db_create_table(self, tabl_sql_str):
+       #create table
+       try:
+           
+            self.dbEngine.execute(tabl_sql_str)
+            ###self.dbEngine.commit()
+            return 0
+       except exc.SQLAlchemyError as err:
+            print('GnIngPgresDBOps: Error creating table ')
+            print(err)
+            return -1
+    
+    def  df_to_sql(self, engine, df, table, schema, if_exists='fail', sep='\t', encoding='utf8'):
+        
+        # Create Table
+        #df[:0].to_sql(table, engine, if_exists=if_exists)
+
+        # Prepare data
+        output = StringIO()
+        c = df.count()
+        print(c)
+        df.to_csv(output, sep=sep, header=False, encoding=encoding)
+        output.seek(0)
+        
+        # Insert data
+        connection = engine.raw_connection()
+        cursor = connection.cursor()
+
+        ###cursor.execute("SELECT * from customer.customer")
+
+        ###data = cursor.fetchall()
+        ###print(data)
+        t = schema+'."'+table+'"'
+        ##print(' Copying data to '+t)
+        cursor.copy_from(output, t,  sep=sep, null='')
+        connection.commit()
+        cursor.close()
+    
+    def  grphdb_create_table(self, nodename, schema):
+        gn_log('GnIngPgresDBOps: create table for node '+nodename)
+        tbl_str = schema+'.'+'"'+nodename+'"'
+        
+        dnode_tablestr = 'CREATE TABLE IF NOT EXISTS '+tbl_str+' (gnnodeid bigint NOT NULL PRIMARY KEY, gnnodetype text, gnmetanodeid bigint,  gndatanodeprop json,  gndatanodeobj json, uptmstmp timestamp);'
+        gn_log("GnGrphDBOps:  table_str "+dnode_tablestr)
+        self.db_create_table(dnode_tablestr)
+        gn_log("GnIngPgresDBOps: table "+tbl_str+" is created ");
+       
+        
     def    _isconnected(self):
         if (self.dbConnp is None):
             return 0
@@ -89,6 +141,18 @@ class       GNGraphPgresDBOps:
         else:
             return resDF.values.tolist()
 
+    def    metadb_nodes_get_metanodes(self, isResultDataFrame):
+        psql_query = '''
+             SELECT  * FROM gnmeta.gnnodes where gnnodetype='GNMetaNode'
+             ''';
+
+        resDF = pds.read_sql(psql_query, self.dbConnp)
+
+        if isResultDataFrame:
+            return resDF
+        else:
+            return resDF.values.tolist()
+        
 
 
     def    metadb_nodes_write(self, metaDF):
@@ -97,11 +161,11 @@ class       GNGraphPgresDBOps:
         #tgt_table="gnnodes"
         #tgt_schema= "gnmeta"
 
-        if (self.dbtype != "gnmetadb"):
-            return -1
+        ##if (self.dbtype != "gnmetadb"):
+        ##    return -1
         
         if (self.connected):
-            metaDF.to_sql(self.gnnode_table, self.dbConnp, schema=self.gnmeta_schema,  if_exists='append', index=False)
+            metaDF.to_sql(self.gnnode_table, self.dbConnp, schema=self.__gdb_metadb_schema,  if_exists='append', index=False)
             return 0
 
     def  metadb_edges_write(self, metaedgeDF):
@@ -109,28 +173,30 @@ class       GNGraphPgresDBOps:
         ### insert mdf to postgresdb
         #tgt_table="gnedges"
         #tgt_schema= "gnmeta"
-        if (self.dbtype != "gnmetadb"):
-            return -1
+        ##if (self.dbtype != "gnmetadb"):
+        ##    return -1
         
         if (self.connected):
-            metaedgeDF.to_sql(self.gnedge_table, self.dbConnp, schema=self.gnmeta_schema,  if_exists='append', index=False)
+            metaedgeDF.to_sql(self.__gdb_metaedges_tbl, self.dbConnp, schema=self.__gdb_metadb_schema,  if_exists='append', index=False)
 
 
 
     def  datadb_nodes_write(self, dataDF, tgt_schema, tgt_table):
-        ### Write metaDF to db
-        ### insert mdf to postgresdb
-        #tgt_table="gnnodes"
-        #tgt_schema= "gnmeta"
 
-        if (self.dbtype != "gndatadb"):
-            return -1
-        gn_log("gnPgresDBops: Writing data node for "+tgt_schema+"."+tgt_table+"  ")
-        if (self.connected):
-            dataDF.to_sql(tgt_table, self.dbConnp, schema=tgt_schema,  if_exists='append', index=False)
+        gn_log("GnIngPgresDBOps: copying datanode "+tgt_schema+"."+tgt_table+" to db ")
+        
+        if (self.connected):        
+            gn_log("GnIngPgresDBOps: copying datanode for "+tgt_schema+"."+tgt_table+"  to db "+self.__gdb_dbname)
+            try:
+                n = dataDF.to_sql(tgt_table, con=self.dbConnp, schema=tgt_schema,  if_exists='append', index=False, chunksize=5000, method='multi')
+            except psycopg2.DatabaseError as e:
+                gn_log("GnIngPgresDBOps: database write error ")
+                gn_log(e)
+                return -1
             return 0
-
-
+        else:
+            gn_log("GnIngPgressDBOps: database is not connected. Failing the operation ")
+            return -1
 
             
     def  datadb_edges_write_na(self, dataEdgeDF):
@@ -140,7 +206,7 @@ class       GNGraphPgresDBOps:
         #tgt_schema= "gnmeta"
         
         if (self.connected):
-            dataEdgeDF.to_sql(self.gnedge_table, self.dbConnp, schema=self.gnmeta_schema,  if_exists='append', index=False)
+            dataEdgeDF.to_sql(self.__gdb_metaedges_tbl, self.dbConnp, schema=self.gnmeta_schema,  if_exists='append', index=False)
 
 
             
@@ -159,14 +225,14 @@ class       GNGraphPgresDBOps:
             return -1
 
 
-    def   create_gndata_datatable(self, bizdomain, nodename):
+    def   create_gndata_datatable_obsolete(self, bizdomain, nodename):
 
-        if (self.dbtype != "gndatadb"):
-            return -1
-        tabl_name = bizdomain+"."+nodename
+        ##if (self.dbtype != "gndatadb"):
+        ##    return -1
+        tabl_name = bizdomain.lower()+"."+nodename.lower()
         datatbl_col= "gnnodeid bigint NOT NULL PRIMARY KEY, gnnodetype text, gnmetanodeid bigint, gndatanodeprop json, gndatanodeobj json, uptmstmp Timestamp"  
         create_tbl_str = "CREATE TABLE IF NOT EXISTS "+tabl_name+" ("+datatbl_col+")"
-        gn_log('gnPgreDBOps: tablstr: '+create_tbl_str)
+        print('gnPgreDBOps: tablstr: '+create_tbl_str)
         self.dbEngine.execute(create_tbl_str) 
         return
 
@@ -222,208 +288,3 @@ class       GNGraphPgresDBOps:
             metaBizRuleDF.to_sql(self.gnbizrules_table, self.dbConnp, schema=self.gnmeta_schema,  if_exists='append', index=False)
             return 0
     
-"""
-      New Gngraph DB Initialize method create new gngraph database  and setup schemas, tables. The following schemas and tables are created- 
-"""
-
-class       GNGraphPgresDBMgmtOps:
-
-    @classmethod
-    def from_json(cls, dbname, json_file="gngraph_pgresdb_creds.json"):
-
-        auth_file = PurePath(__file__).parents[0].joinpath(json_file)
-
-        with open(auth_file, encoding='utf-8') as fh:
-           gdb_creds = json.load(fh)
-
-        return cls(gdb_creds["dbserver"], gdb_creds["dbport"], gdb_creds["dbuser"], gdb_creds["dbpasswd"], dbname, gdb_creds["dbtype"])
-
-    
-    @classmethod
-    def from_args(cls, dbserver, dbport, dbuser, dbpasswd, dbname, dbtype):
-        return cls(dbserver, dbport, dbuser, dbpasswd, dbname, dbtype)
-
-
-    def __init__(self, dbserver, dbport, dbuser, dbpasswd, dbname, dbtype):
-            self.dbuser = dbuser
-            self.dbpasswd = dbpasswd
-            self.dbserver = dbserver
-            self.dbport = dbport
-            self.dbname = dbname
-
-            ##
-            self.gnnode_table = "gnnodes"
-            self.gnbizrules_table = "gnbizrules"
-            self.gnmeta_schema = "gnmeta"
-            self.gnedge_table = "gnedges"
-            self.dbtype = dbtype
-
-
-    
-    def   db_connect(self):
-        try:
-            #Create an engine instance
-            pgres_connstr='postgresql+psycopg2://'+self.dbuser+':'+self.dbpasswd+'@'+self.dbserver+':'+self.dbport+'/'+self.dbname
-            print('PgresDBOps: Init ')
-            print(pgres_connstr)
-            alchemyEngine   = create_engine(pgres_connstr, pool_recycle=3600)
-            # Connect to PostgreSQL server
-            self.dbEngine = alchemyEngine
-            self.dbConnp = alchemyEngine.connect();
-            self.connected = 1
-            print('pgresDBOps: Connected  ')
-            print(self.dbConnp)
-        except exc.SQLAlchemyError as err:
-            self.dbConnp = None
-            self.connected = 0
-            print('gngraphPgresDBOps: unable to connect pgres ')
-            print(err)
-
-        return self.connected
- 
-
-            
-    def   db_create_database_1(self, dbname):
-
-       ###self.dbConnp.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT) # Need AUTOCOMMIT for CREATE DATABASE
-       ##cur = con.cursor()
-       self.dbConnp.autocommit = True 
-       #create database first
-       sql_cmd = f"CREATE DATABASE "+dbname+";"
-       self.dbEngine.execute(sql_cmd)
-
-       
-    def   db_create_schema_1(self, schemaname):
-       #create schema 
-       sql_cmd = f"CREATE SCHEMA  "+schemaname+";"
-       self.dbEngine.execute(sql_cmd)
-
-    def   db_create_table(self, tabl_sql_str):
-       #create table
-       try:
-           
-            self.dbEngine.execute(tabl_sql_str)
-            return 0
-       except exc.SQLAlchemyError as err:
-            print('gngraphPgresDBOps: Error creating table ')
-            print(err)
-            return -1
-
-    def    db_create_schema(self, db_name, schema_name):
-
-       try:
-            con = psycopg2.connect(dbname=db_name,
-                                user=self.dbuser, host=self.dbserver, port=self.dbport,
-                                password=self.dbpasswd)
-
-            con.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT) # <-- ADD THIS LINE
-            cur = con.cursor()
-
-            # Use the psycopg2.sql module instead of string concatenation
-            # in order to avoid sql injection attacs.
-            cur.execute(sql.SQL("CREATE SCHEMA IF NOT EXISTS {}").format(
-                       sql.Identifier(schema_name))
-                      )
-            con.close()
-            return 0
-       except:
-           print("ERROR ")
-           return -1
-
-        
-    def    db_create_database(self, newdbname):
-
-       try: 
-            con = psycopg2.connect(dbname='postgres',
-                                user=self.dbuser, host=self.dbserver, port=self.dbport,
-                                password=self.dbpasswd)
-
-            con.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT) # <-- ADD THIS LINE         
-            cur = con.cursor()
-            # Use the psycopg2.sql module instead of string concatenation 
-            # in order to avoid sql injection attacs.
-            # Psql does not support IF NOT EXISTS for database
-            ##sql_cmd="SELECT 'CREATE DATABASE "+newdbname+"' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '"+newdbname+"')\gexec"
-            cur.execute(sql.SQL("CREATE DATABASE {}").format(
-                       sql.Identifier(newdbname))
-                      )
-            ###cur.execute(sql.SQL(sql_cmd))
-            con.close()
-            return 0
-       except psycopg2.OperationalError as err:
-           gn_log(" CREATE DATABASE ERROR ")
-           gn_log(err)
-           return -1
-       except psycopg2.Error as err:
-           gn_log('CREATE DATABASE ERROR  ')
-           gn_log(err)
-           return -1
-        
-    def   gngraph_db_initialize(self, newdbname, iscreatedb):
-
-        gn_log('GNGraphDBInit: Initializing Graph on database '+newdbname)
-        ## First check connecting to postgres
-        self.dbname = "postgres"
-        
-        ##connected = self.db_connect()
-        ##if (connected == 0):
-        ##    print('GNGraphDBInit: ERROR Failed to connect to DB ')
-        ##    return -1
-
-        ## first create gngraph
-        if (iscreatedb == 1):
-          res = self.db_create_database(newdbname)
-
-          if (res < 0):
-               gn_log('GNGraphDBInit: ERROR Failed to create new database : '+newdbname)
-               return res
-          gn_log('GNGraphDBInit: database '+newdbname+' is created ')
-          
-        ## Now connect using new database
-        self.dbname = newdbname
-        connected = self.db_connect()
-        if (connected == 0):
-            gn_log('GNGraphDBInit: Failed to connect new database:'+newdbname)
-            return -1
-    
-        ### create schema
-        self.db_create_schema(newdbname, "gnmeta")
-        gn_log('GNGraphDBInit: gnmeta schema created ')
-        
-        gnnode_tablestr = "CREATE TABLE IF NOT EXISTS gnmeta.gnnodes (gnnodeid bigint NOT NULL PRIMARY KEY, gnnodename text, gnnodetype text, gnnodeprop json, uptmstmp timestamp);"
-        #print('GNPgreDBMgmtOps: create table '+gnnode_tablestr) 
-        self.db_create_table(gnnode_tablestr)
-        gn_log('GNGraphDBInit: table gnnodes is created ')
-        
-        gnedge_tablestr = "CREATE TABLE IF NOT EXISTS gnmeta.gnedges ( gnedgeid bigint NOT NULL PRIMARY KEY, gnedgename text, gnedgetype text, gnsrcnodeid bigint,  gntgtnodeid bigint, gnedgeprop json, uptmstmp timestamp);"
-        ##print('GNPgreDBMgmtOps: create table '+gnedge_tablestr)
-        self.db_create_table(gnedge_tablestr)
-        gn_log('GNGraphDBInit: table gnedges is created ')
-        
-        gnbizrules_tablestr = "CREATE TABLE IF NOT EXISTS gnmeta.gnbizrules ( gnrelid bigint NOT NULL PRIMARY KEY, gnrelname text, gnreltype text, gnsrcnodeid  bigint, gntgtnodeid  bigint, gnmatchnodeid bigint, gnrelprop json, gnrelobj json, state text, freq text, uptmstmp  timestamp);"
-        #print('GNPgreDBMgmtOps: create table '+gnbizrules_tablestr)
-        self.db_create_table(gnbizrules_tablestr)
-        gn_log('GNGraphDBInit: table gnbizrules is created ')
-        
-        ## Create default Business Domains
-        self.db_create_schema(newdbname, "CUSTOMER_DOMAIN")
-        self.db_create_schema(newdbname, "PRODUCT_DOMAIN")
-        self.db_create_schema(newdbname, "SALES_DOMAIN")
-        gn_log('GNGraphDBInit: schemas CUSTOMER_DOMAIN, PRODUCT_DOMAIN, SALES_DOMAIN are created ')
-        gn_log('GNGraphDBInit: GNGraph Intialization Successful ')
-        return 0
-
-
-
-
-def     gngrph_pgres_get_connection_status(pgres_conf):
-
-    pgdb_cls = GNGraphPgresDBOps(pgres_conf['serverIP'], pgres_conf['serverPort'], pgres_conf['username'], pgres_conf['password'], dbname, "")
-    is_connect = pgdb_cls._isconnected()
-
-    if (is_connect == 1):
-        connection_status = "Connected"
-    else:
-        connection_status = "NotConnected"
-
-    return connection_status
