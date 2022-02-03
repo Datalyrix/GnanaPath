@@ -20,6 +20,7 @@ RUN apt-get update \
     && apt-get -y install libpq-dev gcc \
     && pip install psycopg2
 
+COPY jars/*.jar /usr/local/lib/python3.9/site-packages/pyspark/jars
 WORKDIR /opt/GnanaPath
 COPY gnappsrv/ gnappsrv/
 COPY gngraph/ gngraph/
