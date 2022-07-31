@@ -1,9 +1,12 @@
 import os
 import sys
+from threading import Thread
+from queue import Queue
 import psycopg2
 import pandas as pds
 import json
 from sqlalchemy import create_engine
+
 """
     GnGraph Ingest Ops for batch files using pd frames
 
@@ -22,55 +25,65 @@ from gnappsrv.gn_config import gn_pgresdb_getconfiguration
 
 class     GNGraphIngestOps:
 
-    def __init__(self, fileargs, gdbargs):
+    def __init__(self,   gndata_folder, gndb_creds_folder, gncfg_settings):
 
-        self.__fargs = fileargs
-        self.__gdbargs = gdbargs
+        self.__gnupload_folder = gndata_folder+"/uploads"
+        self.__gndata_folder = gndata_folder        
+        self.__gndb_creds_folder = gndb_creds_folder
+        self.__gncfg_settings = gncfg_settings
+        ###self.__sfargs = sfargs
+
+        
+        ### Establish metadb conn and datadb conn    
+        if (self.__gncfg_settings["dbmode"] == 1):
+            self.gndb_setup()
+
+        if (self.__gncfg_settings["sfmode"] == 1):
+            gngraph_folder =   self.__gndata_folder+"/gngraph";
+            self.__gngrp_sfops = GNGraphStaticFileOps(gngraph_folder)
+            
+        ## get config class
+        #if (self.__sfargs["sfmode"] == 1):
+        id_cfg_path = self.__gndata_folder+"/gngraph/config"
+        self.__gngrp_cfg = GNGraphConfig(id_cfg_path)
+                       
+
+    def    gndb_setup(self):
+
+        ###with open(self.__gdbargs["gdbcredsfpath"], encoding="utf-8") as fh:
+        ###     gdb_creds = json.load(fh)
+        
+        gdb_creds = gn_pgresdb_getconfiguration(self.__gndb_creds_folder)        
+        self.__gdbDBConnp = GNGraphPgresDBOps.from_args(gdb_creds["serverIP"], gdb_creds["serverPort"], gdb_creds["username"], gdb_creds["password"], gdb_creds["dbname"], "gnmetadb")         
+        ####self.__gdbDataDBConnp = GNGraphPgresDBOps.from_args(gdb_creds["dbserver"], gdb_creds["dbport"], gdb_creds["dbuser"], gdb_creds["dbpasswd"],  self.__gdbargs["gndataDB"], "gndatadb")
+        
+
+    def    gngrph_ingest_file(self, fargs):
+
+        self.__fargs = fargs
+        
         if (self.__fargs["ftype"] == "csv"):
             try:
                  self.__nodeDF = pds.read_csv(self.__fargs["fpath"], delimiter=self.__fargs["fdelim"])
             except Exception as err:
                  print(err)
-            gn_log('GnIngPdOps: csv file '+self.__fargs["fpath"]+' is parsed and created dataframe')
+            gn_log('GnIngestPdOps: csv file '+self.__fargs["fpath"]+' is parsed and created dataframe')
 
         if (self.__fargs["ftype"] == "json"):
             try:
                 self.__nodeDF = pds.read_json(self.__fargs["fpath"])
             except Exception as err:
                 print(err)
-            gn_log('GnIngPdOps: json file '+self.__fargs["fpath"]+' is parsed and created dataframe')    
+            gn_log('GnIngestPdOps: json file '+self.__fargs["fpath"]+' is parsed and created dataframe')    
  
-            
-        ### Establish metadb conn and datadb conn    
-        if (self.__gdbargs["gdbflag"]):
-            self.gdb_conn_setup()
-
-        if (self.__gdbargs["staticfiles"]):
-            gngraph_folder = self.__gdbargs["gndatafolder"]+"/gngraph";
-            self.__gngrp_sfops = GNGraphStaticFileOps(gngraph_folder)
-            
-            
-        ## get config class
-        if (self.__gdbargs["gndatafolder"]):
-            id_cfg_path = self.__gdbargs["gndatafolder"]+"/gngraph/config"
-            self.__gngrp_cfg = GNGraphConfig(id_cfg_path)
-
+       
         ###set metanode columns for pgresdb and static files
         self.__metanode_columns=["gnnodeid", "gnnodename", "gnnodetype", "gnnodeprop", "uptmstmp"]
         self.__metaedge_columns=["gnedgeid", "gnedgename", "gnedgetype", "gnsrcnodeid", "gntgtnodeid", "gnedgeprop", "uptmstmp"]
 
         self.gnnodeparentid = -1
         self.gnnode_parent_name = self.__fargs["nodename"]
-            
-    def    gdb_conn_setup(self):
-
-        ###with open(self.__gdbargs["gdbcredsfpath"], encoding="utf-8") as fh:
-        ###     gdb_creds = json.load(fh)
-        gdb_creds = gn_pgresdb_getconfiguration(self.__gdbargs["gdbcredsfolder"])        
-        self.__gdbDBConnp = GNGraphPgresDBOps.from_args(gdb_creds["serverIP"], gdb_creds["serverPort"], gdb_creds["username"], gdb_creds["password"], gdb_creds["dbname"], "gnmetadb")         
-        ####self.__gdbDataDBConnp = GNGraphPgresDBOps.from_args(gdb_creds["dbserver"], gdb_creds["dbport"], gdb_creds["dbuser"], gdb_creds["dbpasswd"],  self.__gdbargs["gndataDB"], "gndatadb")
-        
-        
+                   
     def     get_metanodeid_byname(name):
         if (self.__gdbargs["gdbflag"]):
             gn_node_id = self.__gdbDBConnp.get_metanode_id(name)
@@ -115,8 +128,13 @@ class     GNGraphIngestOps:
         for c in nodedf_collist:
             gn_nodeid_c=gn_nodeid_c+1
             gn_edgeid_c=gn_edgeid_c+1
-            metanodeprop = {"gnlabel":c, "gnnodeparent":nodename, "bizdomain": self.__fargs["bizdomain"]}
+            gn_nodecol_dtype = str(self.__nodeDF.dtypes[c])
+            
+            metanodeprop = {"gnlabel":c, "gnnodeparent":nodename, "bizdomain": self.__fargs["bizdomain"], "datatype": gn_nodecol_dtype}
+            
             metaedgeprop = {"gntgtlabel":c, "gnsrclabel": nodename, "gnsrcnodeloc": "gnnodes", "gnsrcdomain": "gnmeta", "gntgtnodeloc": "gnnodes", "gntgtdomain":"gnmeta"}
+            #print(' metanode prop ')
+            #print(metanodeprop)
             metanodepropstr = json.dumps(metanodeprop)
             metaedgepropstr = json.dumps(metaedgeprop)
             metanode_e = [gn_nodeid_c, c, "GNMetaNodeAttr", metanodepropstr, utmstmp]
@@ -130,11 +148,11 @@ class     GNGraphIngestOps:
         self.__metaedgeDF = pds.DataFrame(medgeattr_arr, columns=self.__metaedge_columns)
 
         ### Now write metanodes and edges to db and static files
-        if (self.__gdbargs["dbmode"] == 1):
+        if (self.__gncfg_settings["dbmode"] == 1):
            self.__gdbDBConnp.metadb_nodes_write(self.__metanodeDF)
            self.__gdbDBConnp.metadb_edges_write(self.__metaedgeDF)
 
-        if (self.__gdbargs["sfmode"] == 1):
+        if (self.__gncfg_settings["sfmode"] == 1):
            print("gnGraphIngest: write nodes and edges to static files ") 
            self.__metanodeDF["uptmstmp"] = self.__metanodeDF["uptmstmp"].astype(str)
            self.__metaedgeDF["uptmstmp"] = self.__metaedgeDF["uptmstmp"].astype(str)
@@ -181,17 +199,17 @@ class     GNGraphIngestOps:
          
          ##self.__gnmdatanodeDF
          
-         if (self.__gdbargs["dbmode"] == 1):
+         if (self.__gncfg_settings["dbmode"] == 1):
              self.__gdbDBConnp.grphdb_create_table(self.__fargs["nodename"], self.__fargs["bizdomain"])
          
-         if (self.__gdbargs["sfmode"] == 1):
+         if (self.__gncfg_settings["sfmode"] == 1):
              self.__gngrp_sfops.create_gndata_datadirs(self.__fargs["bizdomain"], self.__fargs["nodename"])
 
          ### Now write datanodes to domain schema table
-         if (self.__gdbargs["dbmode"] == 1):
+         if (self.__gncfg_settings["dbmode"] == 1):
              self.__gdbDBConnp.datadb_nodes_write(self.__gndatanodeDF, self.__fargs["bizdomain"], self.__fargs["nodename"])
 
-         if (self.__gdbargs["sfmode"] == 1):
+         if (self.__gncfg_settings["sfmode"] == 1):
              # for static files timestamp has to be JSON serializable
              self.__gndatanodeDF["uptmstmp"] = self.__gndatanodeDF["uptmstmp"].astype(str)
              self.__gngrp_sfops.datadb_nodes_write(self.__gndatanodeDF, self.__fargs["bizdomain"], self.__fargs["nodename"])
@@ -211,9 +229,9 @@ class     GNGraphIngestOps:
 
          
          ###################### Write datanodes to metatable
-         if (self.__gdbargs["dbmode"] == 1):
+         if (self.__gncfg_settings["dbmode"] == 1):
              self.__gdbDBConnp.metadb_nodes_write(self.__gnMetaDatanodeDF)
-         if (self.__gdbargs["sfmode"] == 1):
+         if (self.__gncfg_settings["sfmode"] == 1):
              self.__gngrp_sfops.metadb_nodes_append_write(self.__gnMetaDatanodeDF)
              
 
@@ -241,9 +259,9 @@ class     GNGraphIngestOps:
          #####Select edgenode columns and prepare for write
          self.__gndatanodeEdgeDF = self.__nodeEdgeDF[["gnedgeid","gnedgename","gnedgetype","gnsrcnodeid","gntgtnodeid","gnedgeprop", "uptmstmp"]]
          ## write edges to database
-         if (self.__gdbargs["dbmode"] == 1):
+         if (self.__gncfg_settings["dbmode"] == 1):
              self.__gdbDBConnp.metadb_edges_write(self.__gndatanodeEdgeDF)
-         if (self.__gdbargs["sfmode"] == 1):
+         if (self.__gncfg_settings["sfmode"] == 1):
              self.__gndatanodeEdgeDF["uptmstmp"] = self.__gndatanodeEdgeDF["uptmstmp"].astype(str)
              self.__gngrp_sfops.metadb_edges_append_write(self.__gndatanodeEdgeDF)
              
@@ -266,8 +284,8 @@ def     gngraph_ingest_file_api(filename, ftype, fdelim, nodename, bizdomain, gn
     fileargs["fdelim"] = fdelim
     fileargs["bizdomain"] = bizdomain
 
-    print(' gncfg settings ')
-    print(gncfg_settings)
+    gn_log('GnIngPdOps:  gncfg settings ')
+    gn_log(gncfg_settings)
     print('file args ')
     print(fileargs)
     gdbargs = {}
@@ -285,16 +303,106 @@ def     gngraph_ingest_file_api(filename, ftype, fdelim, nodename, bizdomain, gn
     gdbargs["dbmode"] = gncfg_settings["dbmode"]
     
     
-    gnIngestp = GNGraphIngestOps(fileargs, gdbargs)
+    gnIngestp = GNGraphIngestOps(gndata_folder, gngraph_creds_folder, gncfg_settings)
 
+    gnIngestp.gngrph_ingest_file(fileargs)
+    
     ## First create metanodes and metaedges 
     gnIngestp.create_node_metanodes_edges()
 
     ## Create Datanodes and edges
     gnIngestp.create_node_datanodes_edges()
 
+"""
+     gngraph ingest thread 
+
+"""
+
+def      gngrph_ingest_process_request_thrfn(gngrph_ing_cls, req):
+
+      if (req["cmd"] == "cloneop"):
+        args = req["args"]
+        ### args ={"frommode":"staticfiles", "tomode": "pgres"}
+        rJ = gngraph_dataclone_op(args["frommode"], args["tomode"], gndata_folder, gngraph_creds_folder, gncfg_settings)
+        resp = {}
+        resp["cmd"] = req["cmd"]
+        resp["status"] = "SUCCESS"
+        resp["data"] = rJ
+        return resp
+
     
 
+def      gngraph_ingest_thread_main(gnRootDir, req_q, resp_q):
+
+    gn_log('GnIngOpsThr:  starting Ingesting thread ')
+    gndata_folder = gnRootDir+"/gndata"
+    gngraph_creds_folder = gnRootDir+"/creds/gngraph"
+
+    gn_log('GnIngOpsThr: initialization ingestion thread ')
+
+    while True:
+        gn_log('GnIngOpsThr: thread waiting for request ')
+        req = req_q.get()
+
+        if (req is None):
+            gn_log('GnIngOpsThr: empty request returned ')
+            req_q.task_done()
+            return
+        else:
+            resp = gngrph_ingest_process_request_thrfn(req)
+
+        time.sleep(4)
+        gn_log('GnIngOpsThr: processing message done ')
+        
+
+def       gngraph_ingest_thread_setup(gnRootDir):
+
+    request_que = Queue()
+    response_que = Queue()
+
+    gn_ing_thr = Thread(target=gngraph_ingest_thread_main, args=(gnRootDir, request_que, response_que))
+
+    gn_ing_thr.setDaemon(True)
+    gn_ing_thr.start()
+
+    gning_thr_config = {}
+    gning_thr_config["request_queue"] = request_que
+    gning_thr_config["response_queue"] = response_que
+    gning_thr_config["ingthr"] = gn_ing_thr
+
+    return gning_thr_config
+
+
+def      gngrph_ingest_thr_sendreq(gning_thr_config, tskmsg):
+   
+    # Send the task on request queue
+    gning_thr_config["request_queue"].put(tskmsg)
+    time.sleep(1)
+    
+    #Now wait for request
+    resp = gning_thr_config["response_queue"].get()
+
+    return resp
+
+
+
+def     gngrph_ingest_cloneop_request(req):
+
+    tskcmd="cloneop"
+
+    t = {}
+    t["cmd"] = "cloneop"
+    t["args"] = {"from": frommode, "to": tomode }
+
+    resp = gngrph_ingest_thr_sendreq(t)
+
+    rJData = json.loads(resp)
+    rdata = rJData["data"]
+
+    gn_log('GnIngOps: request send for '+t["cmd"])
+    return rdata
+    
+                
 
     
 if __name__ == "__main__":

@@ -1,0 +1,13 @@
+{
+"rulename": "PayCustomer",
+"srcnode": "customer",
+
+"targetnode": "product",
+
+"relation" : "BUYS",
+
+"matchnode": "salesorder",
+    
+"matchcondition": "select c.customerid, p.productid from salesorder as s INNER JOIN customer as c ON c.customerid = s.customerid INNER JOIN product as p ON  p.productid=s.productid"
+
+}

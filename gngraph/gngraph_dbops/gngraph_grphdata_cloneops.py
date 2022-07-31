@@ -25,7 +25,8 @@ print(' Root directory '+rootDir)
 print(' Parent directory '+parentDir)
     
 from gngraph.config.gngraph_config import GNGraphConfig
-from gngraph.gngraph_dbops.gngraph_pgresdbops import GNGraphPgresDBOps, GNGraphPgresDBMgmtOps
+from gngraph.gngraph_dbops.gngraph_pgresdbops import GNGraphPgresDBOps
+from gngraph.gngraph_dbops.gngraph_pgres_dbmgmtops import GNGraphPgresDBMgmtOps
 from gngraph.gngraph_dbops.gngraph_staticfileops import GNGraphStaticFileOps
 from gnappsrv.gn_config import gn_log, gn_log_err
 from gnappsrv.gn_config import gn_pgresdb_getconfiguration
@@ -144,7 +145,7 @@ class     GNGraphDataCloneOps:
  When DBmode is turned on, we update data from static files to database and turn searching using dbmode
 
 """
-def     gngraph_dataclone_sf_to_pgres(gndata_folder, gngraph_creds_folder, gncfg_settings):
+def     gngraph_dataclone_op(frommode, tomode, gndata_folder, gngraph_creds_folder, gncfg_settings):
 
     gdb_creds_filepath=gngraph_creds_folder+"/gngraph_pgres_dbcreds.json"
     fileargs = {}
@@ -161,8 +162,8 @@ def     gngraph_dataclone_sf_to_pgres(gndata_folder, gngraph_creds_folder, gncfg
     gdbargs["gndatafolder"] = gndata_folder
     
     gngrph_clone_ops = GNGraphDataCloneOps(gdbargs)    
-    frommode="staticfiles"
-    tomode="pgres"
+    #frommode="staticfiles"
+    #tomode="pgres"
     gngrph_clone_ops.upload_metainfo(frommode)
     gn_log('GnGrphCloneOps: copying metanodes from '+frommode+' to '+tomode)
     gngrph_clone_ops.write_metaDF(tomode)     
@@ -195,7 +196,9 @@ def     gngraph_dataclone_sf_to_pgres(gndata_folder, gngraph_creds_folder, gncfg
                gn_log("GnGrpCloneOps: DB copying data for node "+gnnodename+"  FAILED ")
            else:
                gn_log("GnGrphCloneOps: DB copying data for node "+gnnodename+"  SUCCESS")
-    
+
+
+               
 if __name__ == "__main__":
     
     gndata_folder="/opt/gnpdev/gndata"

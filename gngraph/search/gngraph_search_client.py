@@ -81,6 +81,9 @@ def     gngrph_search_client_sendreq(t):
            resp += bytes_read
 
         s.close()
+
+        print("GnSrchOps recv resp  ")
+        print(resp)
         rJ = json.loads(resp)
         gn_log("GnSrchOps: recv resp cmd "+rJ["cmd"]+"  status "+rJ["status"])
         
@@ -102,7 +105,7 @@ def     gngrph_search_client_sendreq(t):
         
     return resp
 
-def      gngrph_metanodes_get_request():
+def      gngrph_metanodes_get_request(srchfilter):
     
     tskcmd="metanodes"
     #print(' task cmd ')
@@ -111,7 +114,7 @@ def      gngrph_metanodes_get_request():
     nodeonly = 0
     t = {}
     t["cmd"] = "metanodes"
-    t["args"] = ""
+    t["args"] = srchfilter
     t["nodeonly"] = nodeonly
 
     resp = gngrph_search_client_sendreq(t)
@@ -123,6 +126,27 @@ def      gngrph_metanodes_get_request():
     print(rJData)
     return rJData
 
+def      gngrph_metanodesattrs_get_request():
+    
+    tskcmd="metanodeattrs"
+    #print(' task cmd ')
+    #print(tskcmd)
+    srchfilter = ""
+    nodeonly = 0
+    t = {}
+    t["cmd"] = "metanodesattrs"
+    t["args"] = ""
+    t["nodeonly"] = nodeonly
+
+    resp = gngrph_search_client_sendreq(t)
+    
+    rJData = json.loads(resp)
+    rdata = rJData["data"]
+  
+    print('GnSrchReq:  get Meta nodeattrs response ')
+    print(rJData)
+    return rJData
+ 
 
 def      gngrph_meta_remap_request():
     
@@ -225,12 +249,20 @@ def      gnsrch_metaqry_request(srchfilter):
     return res
 
 
-def     gnsrch_metanodes_request():
+def     gnsrch_metanodes_request(srchfilter):
 
    if (gnsrch_thread_flag == 1):
-       res = gngrph_metanodes_get_request()
+       res = gngrph_metanodes_get_request(srchfilter)
    else:
        res = gngraph_search_main.gngrph_srch_metarepo_qry_fetch_nodes_api(gnsrch_ops, gnp_spark, srchfilter)
+   return res
+
+def     gnsrch_metanodesattrs_request():
+
+   if (gnsrch_thread_flag == 1):
+       res = gngrph_metanodesattrs_get_request()
+   ##else:
+   ##    res = gngraph_search_main.gngrph_srch_metarepo_qry_fetch_nodes_api(gnsrch_ops, gnp_spark, srchfilter)
    return res
 
 def    gnsrch_meta_remap_request():
