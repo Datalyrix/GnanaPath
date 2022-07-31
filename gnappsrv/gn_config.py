@@ -2,6 +2,8 @@ import os
 import sys
 from tinydb import TinyDB, Query, where
 from tinydb.table import Document
+###from time import time, ctime
+from datetime import datetime
 
 """
  gn_config Module : sets the directory and sets the config dir config vars
@@ -140,6 +142,165 @@ class GNGraphConfigModel:
     def stop_db(self):
         self._db.close()
 
+
+class GNGraphDatabaseListModel:
+
+    query = Query()
+
+    def __init__(self, db_path):
+        dbpath = os.path.join(db_path, 'gngraph_dblist.json')
+        ##if (os.path.exists(dbpath)): 
+        self._db = TinyDB(dbpath)
+        #else:
+        #   def_dict = {'dbname': 'gngraph', 'dbmode': 0}
+        #   self._db = TinyDB(dbpath)
+        #   self.insert_op(def_dict)
+           
+    def req_fields_json(self, dict_result):
+        req_items = ['id', 'dbname', 'dbtype', 'createdOn']
+        return {key: value for key, value in dict_result.items()
+                if key in req_items}
+
+    def search_db_exists(self, req_dict):
+        exists = self._db.search((GNGraphDatabaseListModel.query.dbname == req_dict['dbname'])   & (GNGraphDatabaseListModel.query.dbtype == req_dict['dbtype']))
+        return True if exists else False
+
+    def search_db(self, req_dict):        
+        return  self._db.search((GNGraphDatabaseListModel.query.dbname == req_dict['dbname'])   & (GNGraphDatabaseListModel.query.dbtype == req_dict['dbtype']))
+
+    def search_db_byid(self, id):
+        return  self._db.search(GNGraphDatabaseListModel.query.id == id)
+    
+    def search_get_all_dbs(self):
+        return self._db.all()    
+
+    def insert_db_op(self, req_dict):
+        if not self.search_db(req_dict):
+            rec_id = self._db.__len__()
+            req_dict['id'] = rec_id+1;
+            ###req_dict['tags'] = '';
+            self._db.insert(req_dict)
+            ##return self._db.all()
+            return req_dict['id']
+        return "None_Insert"
+
+    def delete_op(self, req_dict):
+        srec =  self.search_db(req_dict)
+        if srec:
+            self._db.remove(where('id') == req_dict['id'])
+            return self._db.all()
+        return "None_Delete"
+
+    def update_state_op(self, req_dict):
+        if not self.search_db_byid(req_dict['id']):
+            return False
+        self._db.update({'state': req_dict['state']
+                         },
+                        GNGraphDatabaseListModel.query.id == req_dict['id'])        
+        return True
+     
+
+    def search_res(self, id):
+        return self._db.get(doc_id=id)
+
+    def insert_op(self, req_dict):
+        if not self.search_op(1):
+            self._db.insert(req_dict)
+            return self._db.all()
+        else:
+            self.update_op(req_dict)
+            return "None_Insert"
+
+    def upsert_op(self, req_dict):
+        ##self._db.upsert(req_dict, GNGraphDBConfigModel.query.serverIP == req_dict['serverIP'])
+        self._db.upsert(Document(req_dict, doc_id=1))
+
+    
+    def get_op(self):
+        return self._db.get(doc_id=1)
+    
+
+
+class GNGraphBizDomainListModel:
+
+    query = Query()
+
+    def __init__(self, db_path):
+        dbpath = os.path.join(db_path, 'gngraph_bizdomains.json')
+        ##if (os.path.exists(dbpath)): 
+        self._db = TinyDB(dbpath)
+        #else:
+        #   def_dict = {'dbname': 'gngraph', 'dbmode': 0}
+        #   self._db = TinyDB(dbpath)
+        #   self.insert_op(def_dict)
+           
+    def req_fields_json(self, dict_result):
+        req_items = ['id', 'bizdomain', 'type', 'db', 'createdOn']
+        return {key: value for key, value in dict_result.items()
+                if key in req_items}
+
+    def search_db_exists(self, req_dict):
+        exists = self._db.search((GNGraphBizDomainsListModel.query.bizdomain == req_dict['bizdomain'])   & (GNGraphBizDomainsListModel.query.db == req_dict['db']))
+        return True if exists else False
+
+    def search_bizdomain(self, req_dict):        
+        return  self._db.search((GNGraphBizDomainListModel.query.bizdomain == req_dict['bizdomain'])   & (GNGraphBizDomainListModel.query.db == req_dict['db']))
+
+    def search_bizdomain_byid(self, id):
+        return  self._db.search(GNGraphBizDomainListModel.query.id == id)
+
+    def search_bizdomain_bydb(self, db):
+        return  self._db.search(GNGraphBizDomainListModel.query.db == db)
+
+    def search_get_all_bizdomains(self):
+        return self._db.all()    
+
+    def insert_bizdomain_op(self, req_dict):
+        if not self.search_bizdomain(req_dict):
+            rec_id = self._db.__len__()
+            req_dict['id'] = rec_id+1;
+            ###req_dict['tags'] = '';
+            self._db.insert(req_dict)
+            ##return self._db.all()
+            return req_dict['id']
+        return "None_Insert"
+
+    def delete_op(self, req_dict):
+        srec =  self.search_db(req_dict)
+        if srec:
+            self._db.remove(where('id') == req_dict['id'])
+            return self._db.all()
+        return "None_Delete"
+
+    def update_state_op(self, req_dict):
+        if not self.search_bizdomain_byid(req_dict['id']):
+            return False
+        self._db.update({'state': req_dict['state']
+                         },
+                        GNGraphBizDomainsListModel.query.id == req_dict['id'])        
+        return True
+     
+
+    def search_res(self, id):
+        return self._db.get(doc_id=id)
+
+    def insert_op(self, req_dict):
+        if not self.search_op(1):
+            self._db.insert(req_dict)
+            return self._db.all()
+        else:
+            self.update_op(req_dict)
+            return "None_Insert"
+
+    def upsert_op(self, req_dict):
+        ##self._db.upsert(req_dict, GNGraphDBConfigModel.query.serverIP == req_dict['serverIP'])
+        self._db.upsert(Document(req_dict, doc_id=1))
+
+    
+    def get_op(self):
+        return self._db.get(doc_id=1)
+    
+    
 """
 gn_config_init: Main init config routine 
 """
@@ -197,7 +358,63 @@ def        gn_config_init(app):
     gndb_cfg_settings = gndb_cfg.get_op()
     gncfg_settings["gnDBCfgSettings"] = gndb_cfg_settings    
     app.config["gnCfgSettings"] = gncfg_settings
-                                    
+
+    gndb_list_cfg = GNGraphDatabaseListModel(app.config['gnGraphDBCredsFolder'])
+    
+    ##gndb_list["gnDBList"] = gndb_list_settings
+    ##tm = time()
+    ##crtm = ctime(tm)
+    tm = datetime.now()
+    
+    req_dict = {'dbname': 'gngraph', 'dbtype': 'static', 'created': str(tm)}
+    gndb_list_cfg.insert_db_op(req_dict)
+
+    gndb_list = gndb_list_cfg.search_get_all_dbs()
+    app.config["gnDBList"] = gndb_list
+    app.config["gnDBListCfg"] = gndb_list_cfg
+
+    ###Add schemas 
+    gndb_bizdom_list_cfg = GNGraphBizDomainListModel(app.config['gnGraphDBCredsFolder'])
+    
+    ##gndb_list["gnDBList"] = gndb_list_settings
+    ##tm = time()
+    ##crtm = ctime(tm)
+    tm = datetime.now()
+    ### Add default bizdomains: customer, product, sales
+    req_dict = {'bizdomain': 'customer', 'type': 'bizdomain', 'db': 'gngraph', 'created': str(tm)}
+    gndb_bizdom_list_cfg.insert_bizdomain_op(req_dict)
+    
+    req_dict = {'bizdomain': 'product', 'type': 'bizdomain', 'db': 'gngraph', 'created': str(tm)}
+    gndb_bizdom_list_cfg.insert_bizdomain_op(req_dict)
+
+    req_dict = {'bizdomain': 'sales', 'type': 'bizdomain', 'db': 'gngraph', 'created': str(tm)}
+    gndb_bizdom_list_cfg.insert_bizdomain_op(req_dict)
+
+    db = "gngraph"
+    gndb_bizdom_list = gndb_bizdom_list_cfg.search_bizdomain_bydb(db)
+    app.config["gndbBizDomList"] = gndb_bizdom_list
+    app.config["gndbBizDomListCfg"] = gndb_bizdom_list_cfg
+
+    
+
+
+    
+def   gn_cfg_gngraph_dblist(gndb_list_cfg):
+    
+    ##gndb_list_cfg = GNGraphDatabaseListModel(app.config['gnGraphDBCredsFolder'])
+    
+    ##gndb_list["gnDBList"] = gndb_list_settings
+    gndb_list = gndb_list_cfg.search_get_all_dbs()    
+    return gndb_list
+
+def   gn_cfg_bizdomain_list_bydb(gndb_bizdom_list_cfg, db):
+    
+    ##gndb_list_cfg = GNGraphDatabaseListModel(app.config['gnGraphDBCredsFolder'])
+    
+    ##gndb_list["gnDBList"] = gndb_list_settings
+    ##gndb_list = gndb_list_cfg.search_get_all_dbs()
+    gndb_bizdom_list = gndb_bizdom_list_cfg.search_bizdomain_bydb(db)
+    return gndb_bizdom_list
     
 def   gn_pgresdb_getconfiguration(credfpath):
     
@@ -205,5 +422,13 @@ def   gn_pgresdb_getconfiguration(credfpath):
     gn_log('GnDBCfg: getting postgres config ')
     gndb_cfg_settings = gndb_cfg.get_op()
     return gndb_cfg_settings
+
+
+def   gn_cfg_getaccessmode(credfpath):
+    
+    gncfg = GNGraphConfigModel(credfpath)
+    gncfg_settings = gncfg.get_op()
+    gn_log('GnCfg: getting config accessmode ')
+    return gncfg_settings
 
 
