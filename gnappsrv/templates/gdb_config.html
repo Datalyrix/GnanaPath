@@ -2,103 +2,120 @@
 {% block content %}
 
 <div class="content-section">
-  <form class="md-form" method="post" action="" enctype="multipart/form-data">
+  
+    <form class="md-form" method="post" action="" enctype="multipart/form-data">
     
-   <div class="input-group">
-       <label class="custom-label" ><h4>GNGraph Configuration</h4> </label>
-   </div>
-
-
-</div>
- <hr/>
-    <div class="p-2">
-      <h5> Static Files Mode </h5>
-      <div class="row">
-	 <div class="col-md-12">
-	       <label> Static file mode </label>
-	       {% if cfg['sfmode']  %}
-                   <input type="checkbox" name="sfmode" id="sfmode" checked></input>
-		{% else  %}
-                   <input type="checkbox" name="sfmode" id="sfmode"  ></input>
-		   
-		{% endif %}
-		<div class="row">   
-                  <label> Static Files mode is enabled by default </label>
-		</div>  
-         </div>
-
-      </div>
-      
-    </div>
-    <hr>
-    <div class="p-2">
-      <h5> Database Mode </h5>
-
-      <div class="row">
-	<div class="col-md-12">
-	  
-	  <label> Enable heck to turn on Postgres Database mode </label>
-	  {% if cfg['dbmode']  %}
-   	  <input type="checkbox" name="dbmode" id="dbmode" checked></input><br>
-	  <hr>
-	  <button id="dbdefaultmode"> Set </button> <h5> databasemode as default</h5>
-          {% else %}
-	     <div>  
-	       <input type="checkbox" name="dbmode" id="dbmode"></input>
-	     </div>
-	  {% endif %}  
-	    
-	</div>	
-      </div>
-
-      <hr>
-      
-      <label> Current Postgres DB Settings </label>
-      <table class="table">
-	<thead>
-	  <tr>
-	    <th scope="col">#</th>
-	    <th scope="col">Value</th>
-	  </tr>
-	</thead>
-	<tbody>
-	  <tr>
-	    <th scope="row"> DB Server Name</th>
-	    <td>{{ pgres_conf["serverIP"] }} </td>
-	  </tr>
-	  <tr>
-	    <th scope="row">DB Port</th>
-	    <td>{{ pgres_conf['serverPort'] }}</td>
-	  </tr>
-	  <tr>
-	    <th scope="row">DB User</th>
-	    <td>{{ pgres_conf['username'] }}</td>
-	  </tr>
-          <tr>
-	    <th scope="row">DB Name</th>
-	    <td>{{ pgres_conf["dbname"] }} </td>
-	  </tr>
-	    <tr>
-	    <th scope="row">DB Connection Status</th>
-	    <td>{{ pgres_conf["connectionStatus"] }} </td>
-	  </tr>
-	</tbody>
-	</table>
-
-        <div class="row">
-          <div class="col-md-12">
-             <a class="btn btn-primary" href="/pgresdb_conf" role="button">DB Setup</a>
-          </div>
+        <div class="input-group">
+            <label class="custom-label" ><h5>GnGraph configuration</h5> </label>
         </div>
 
+
+    <div class="p-2 bg-light border">
+   
+        <h5> Static files mode </h5>
+
+       
+        <div class="row">
+	    <div class="col-md-6">
+	        <label> Static file mode </label>
+	        <label> static files mode is enabled by default </label>
+	    </div>
+	    <div class="col-md-6">
+	        {% if cfg['sfmode']  %}
+                    <input type="checkbox" name="sfmode" id="sfmode" checked></input>
+		{% else  %}
+                    <input type="checkbox" name="sfmode" id="sfmode"  ></input>
+		   
+		{% endif %}
+            </div>
+        </div>
       
     </div>
-    
-   <hr>
-    <div class="input-group-prepend">
-        <button type="submit" class="btn btn-primary">Save Settings</button>
+
+     
+    <hr>
+    <div class="p-2 bg-light border">
+        <h5> Database mode </h5>
+
+        <div class="row">
+	    <div class="col-md-6">
+	        <label> Database mode </label>
+	        <label> turn on postgres database mode. required  db settings enabled </label>
+	    </div>
+	    <div class="col-md-6">
+	        {% if cfg['dbmode']  %}
+   	            <!-- <input type="checkbox" name="dbmode" id="dbmode" checked></input><br> -->
+	            <button id="dbmodebtn"> Enable DB mode </button>
+                {% else %}
+	            <div>
+		        <button id="dbmodebtn"> Disable DB mode </button>
+	                <!--<input type="checkbox" name="dbmode" id="dbmode"></input> -->
+	            </div>
+	        {% endif %}  
+	    
+	    </div>	
+        </div>
+
+    <hr>
+    <div class="p-2 bg-light border">
+        <h6> Database settings </h6>
+
+        <div class="row">
+	    <div class="col-md-12">
+
+                <table class="table">
+	            <thead>
+	                <tr>
+	                    <th scope="col">#</th>
+	                    <th scope="col">Value</th>
+	                </tr>
+	            </thead>
+	            <tbody>
+	                <tr>
+	                    <td scope="row"> db server </td>
+	                    <td>{{ pgres_conf["serverIP"] }} </td>
+	                </tr>
+	                <tr>
+ 	                    <td scope="row">db server port</td>
+	                    <td>{{ pgres_conf['serverPort'] }}</td>
+	                </tr>
+	                <tr>
+	                    <td scope="row">db user</td>
+	                    <td>{{ pgres_conf['username'] }}</td>
+	                </tr>
+                        <tr>
+	                    <td scope="row">db name</td>
+	                    <td>{{ pgres_conf["dbname"] }} </td>
+	                </tr>
+	                <tr>
+	                    <td scope="row">db connection status</td>
+	                    <td>{{ pgres_conf["connectionStatus"] }} </td>
+	                </tr>
+	            </tbody>
+	        </table>
+       
+	    </div>
+	</div>
+    </div>
+      
+    <div class="row">
+        <div class="col-md-6">
+	</div>
+	<div class="col-md-6">
+             <a class="btn btn-primary" href="/pgresdb_conf" role="button">Change DB Settings</a>
+        </div>
     </div>
 
+     
+    <hr>
+    <div class="row">
+        <div class="col-md-8">  
+            <div class="input-group-prepend">
+                <button type="submit" class="btn btn-primary">Save Settings</button>
+            </div>
+        </div>
+    </div> 
+    
     
  </form>
 </div>
