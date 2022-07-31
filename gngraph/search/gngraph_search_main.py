@@ -38,7 +38,7 @@ from gngraph.gngraph_dbops.gngraph_pgresdbops_srch import GNGraphSrchPgresDBOps
 from gngraph.gngraph_dbops.gngraph_staticfileops_srch import GNGraphSrchStaticFileOps
 from gngraph.search.gngraph_sqlparser import GNGraphSqlParserOps
 from gnutils.gn_srch_log import gnsrch_log, gnsrch_log_err, gnsrch_logging_init
-from gnappsrv.gn_config  import gn_pgresdb_getconfiguration
+from gnappsrv.gn_config  import gn_pgresdb_getconfiguration, gn_cfg_getaccessmode
 
 """
  Enable search related logs 
@@ -297,8 +297,19 @@ class     GNGraphSearchOps:
 
         
         self.__gnmetaNodesList = n1DF.toJSON().collect()
-        gnsrch_log('GnSrchOps: MetaNodes List ')
-        gnsrch_log(self.__gnmetaNodesList)
+
+        ### get list of GNMetaNodesAttrs list
+        aDF = self.__gnmetaNodesDF_cached
+        a1DF = aDF.filter( (col("gnnodetype") == "GNMetaNode") | (col("gnnodetype") == "GNMetaNodeAttr")  ) \
+                                  .withColumnRenamed("gnnodeid", "id") \
+                                  .withColumnRenamed("gnnodetype", "nodetype") \
+                                  .withColumnRenamed("gnnodename", "nodename")
+
+        
+        self.__gnmetaNodesAttrsList = a1DF.toJSON().collect()
+        
+        gnsrch_log('GnSrchOps: MetaNodesAttrs List ')
+        gnsrch_log(self.__gnmetaNodesAttrsList)
 
     def      gngrph_metarepo_remap(self, nodemode):
 
@@ -315,6 +326,25 @@ class     GNGraphSearchOps:
         rJ = {}
         nodeslen = len(self.__gnmetaNodesList)
         rJ["nodes"] = self.__gnmetaNodesList
+        rJ["nodeslen"] = nodeslen
+        rJ["edges"] = []
+        rJ["edgeslen"] = 0
+        return rJ
+
+    def      gngrph_metarepo_nodes_bybizdomain(self, bizdomain):
+
+        nDF = self.__gnmetaNodesDF_cached
+        n1DF = nDF.filter((col("gnnodetype") == "GNMetaNode") & (col("bizdomain") == bizdomain)) \
+                       .withColumnRenamed("gnnodeid", "id") \
+                       .withColumnRenamed("gnnodetype", "nodetype") \
+                       .withColumnRenamed("gnnodename", "nodename")
+        nlist = n1DF.toJSON().collect()
+        return nlist
+        
+    def      gngrph_metarepo_nodesattrs_get(self):
+        rJ = {}
+        nodeslen = len(self.__gnmetaNodesAttrsList)
+        rJ["nodes"] = self.__gnmetaNodesAttrsList
         rJ["nodeslen"] = nodeslen
         rJ["edges"] = []
         rJ["edgeslen"] = 0
@@ -920,6 +950,7 @@ def        test_datarepo_qry_fn():
     gnp_spark = SparkSession.builder.appName(app_name).getOrCreate()
     nodesonly = 0
     accessmode={'sfmode': 1, 'dbmode':0 }
+    
     gngrph_cls = gngrph_search_init(gnp_spark, gndata_folder, gngraph_creds_folder, accessmode)
 
     
@@ -955,7 +986,23 @@ def     gnspk_process_request_thrfn(gngrph_cls, gnp_spark, req):
         resp["data"] = rJ
         return resp
     
-    if (req["cmd"] == "metanodes"):
+    elif (req["cmd"] == "metanodes"):
+       srchfilter = req["args"]
+       bizdomain = ""
+       if 'bizdomain' in srchfilter:
+           bizdomain = srchfilter["bizdomain"]
+           rJ = gngrph_cls.gngrph_metarepo_nodes_bybizdomain(bizdomain)
+       else:
+           rJ = gngrph_cls.gngrph_metarepo_nodes_get()
+       resp = {}
+       resp["cmd"] = req["cmd"]
+       resp["status"] = "SUCCESS"
+       resp["data"] = rJ
+       gnsrch_log('GnSrchOps: metanodes get resp')
+       gnsrch_log(resp)
+       return resp
+
+    elif (req["cmd"] == "metanodes1"):       
        rJ = gngrph_cls.gngrph_metarepo_nodes_get()
        resp = {}
        resp["cmd"] = req["cmd"]
@@ -965,7 +1012,18 @@ def     gnspk_process_request_thrfn(gngrph_cls, gnp_spark, req):
        gnsrch_log(resp)
        return resp
 
-    if (req["cmd"] == "metaremap"):
+    elif (req["cmd"] == "metanodesattrs"):
+       rJ = gngrph_cls.gngrph_metarepo_nodesattrs_get()
+       resp = {}
+       resp["cmd"] = req["cmd"]
+       resp["status"] = "SUCCESS"
+       resp["data"] = rJ
+       #gnsrch_log
+       print('GnSrchOps: metanodesattrs get resp')
+       print(resp)
+       return resp
+   
+    elif (req["cmd"] == "metaremap"):
        nodemode = req["nodemode"]       
        rJ = gngrph_cls.gngrph_metarepo_remap(nodemode)
        resp = {}
@@ -977,7 +1035,7 @@ def     gnspk_process_request_thrfn(gngrph_cls, gnp_spark, req):
        return resp
    
     ## datasearch
-    if (req["cmd"] == "datasearch"):
+    elif (req["cmd"] == "datasearch"):
         sqlst = req["args"]
         
         if (sqlst == "null"):
@@ -999,7 +1057,16 @@ def     gnspk_process_request_thrfn(gngrph_cls, gnp_spark, req):
         resp["status"] = "SUCCESS"
         resp["data"] = rJ
         return resp
-
+    
+    else:
+        ### Invalid cmd status
+        resp={}
+        resp["cmd"] = req["cmd"]
+        resp["status"] = "ERROR"
+        resp["data"] = []
+        resp["errmsg"] = "Invalid command"
+        return resp
+    
             
 def     gnspk_thread_main(gnRootDir, accessmode, req_q, resp_q):
 
@@ -1010,6 +1077,9 @@ def     gnspk_thread_main(gnRootDir, accessmode, req_q, resp_q):
 
     gnsrch_log('GnSrchOpsThr: initializing spark session thread ' )
     print(accessmode)
+    accmode = gn_cfg_getaccessmode(gngraph_creds_folder)
+    print(" Updated access mode ")
+    print(accmode)
     conf = SparkConf()
     conf.set('spark.executor.memory', '4g')
     conf.set('spark.driver.memory', '4g')
@@ -1018,7 +1088,7 @@ def     gnspk_thread_main(gnRootDir, accessmode, req_q, resp_q):
     
     gnp_spark.sparkContext.setLogLevel("WARN")
     
-    gngrph_cls = gngrph_search_init(gnp_spark, gndata_folder, gngraph_creds_folder, accessmode)
+    gngrph_cls = gngrph_search_init(gnp_spark, gndata_folder, gngraph_creds_folder, accmode)
   
     ### initialized spark session and now wait for some task
     while True:
@@ -1208,6 +1278,7 @@ if __name__ == "__main__":
  else:
      (prog, sfmode, dbmode) = sys.argv
 
- amode = {'sfmode': int(sfmode), 'dbmode': int(dbmode)}    
+     
+ amode = {'sfmode': int(sfmode), 'dbmode': int(dbmode)}
  gnp_spark_app_server_socket(gnRootDir, amode)
  print('Gngraph Search Thread exiting ')
