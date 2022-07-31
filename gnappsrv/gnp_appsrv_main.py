@@ -33,13 +33,13 @@ listDir = curentDir.rsplit('/', 1)[0]
 sys.path.append(listDir)
 
 from gnutils.gn_log import gn_log, gn_log_err
-from gn_config import gn_config_init, GNGraphConfigModel, GNGraphDBConfigModel, gn_pgresdb_getconfiguration
+from gn_config import gn_config_init, GNGraphConfigModel, GNGraphDBConfigModel, gn_pgresdb_getconfiguration, gn_cfg_gngraph_dblist, gn_cfg_bizdomain_list_bydb
 
 from gndatadis.gndd_filedb_ops import gndd_filedb_insert_file_api, gndd_filedb_filelist_get, gndd_filedb_fileinfo_bynode, gndd_filedb_filestate_set
 
 
 from gngraph.search  import gngraph_search_client
-from gngraph.ingest.gngraph_ingest_pd import gngraph_ingest_file_api
+from gngraph.ingest.gngraph_ingest_pd import gngraph_ingest_file_api, gngraph_ingest_thread_setup
 from gngraph.gngraph_dbops.gngraph_pgresdbops import GNGraphPgresDBOps
 from gngraph.gngraph_dbops.gngraph_pgres_dbmgmtops import GNGraphPgresDBMgmtOps
 
@@ -75,6 +75,8 @@ gngraph_init_flag = 0
 # set this flag to 1 if we want to use spark thread 
 gnp_thread_flag=1
 
+# set this flag to 1 if we want to use ingestion thread
+gnp_ingest_thread_flag=1
    
 # Allowed extension you can set your own
 ALLOWED_EXTENSIONS = set(['csv', 'json', ])
@@ -96,7 +98,13 @@ else:
    usr = User()
    all_users = {"gnadmin": usr}
 
+"""
+ Get API key from env
+"""
+app.config["gn_api_key"] = os.getenv("GNAPIKEY")
+    
 
+   
 def allowed_file(filename):
     return '.' in filename and filename.rsplit(
         '.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -227,26 +235,26 @@ def  gdb_config_settings_page():
        gdbcfg_settings = {} 
        gdbcfg_settings['sfmode'] = 1
        gdbcfg_settings['dbmode'] = 0
-    gn_log('Current GnDBmode settings ')
+    gn_log('GnAppSrv: current GnDBmode settings ')
     gn_log(gdbcfg_settings)
 
     pgres_conf = gn_pgresdb_getconfiguration(app.config["gnGraphDBCredsFolder"])
-    gn_log(' GnDB Config settings ')
+    gn_log('GnAppSrv:  GnDB config settings ')
     gn_log(pgres_conf)
     if (request.method == 'POST'):
-        print('GB Config POST')
+        gn_log('GnAppSrv: gn config POST')
         in_vars = request.form.to_dict()
-        print(in_vars)
+        gn_log(in_vars)
         cfg_setting = gdbcfg_settings
         if ('sfmode' in in_vars):
-            print('GNGraphDB: sfmode '+in_vars['sfmode'])
+            gn_log('GnAppSrv: sfmode '+in_vars['sfmode'])
             if (in_vars['sfmode'] == 'on'):
                 cfg_setting['sfmode'] = 1
             else:
                 cfg_setting['sfmode'] = 0
 
         if ('dbmode' in in_vars):
-            print('GNGraphDB: sfmode '+in_vars['sfmode'])
+            gn_log('GnAppSrv: sfmode '+in_vars['sfmode'])
             if (in_vars['dbmode'] == 'on'):
                 cfg_setting['dbmode'] = 1
                 ## dbmode is turned on
@@ -661,13 +669,13 @@ def  ingest_node_intodb():
             }
         return jsonify(rjson)
     
-    print('GnAppSrv: Ingesting node '+nodename+' into graphdb ')
+    gn_log('GnAppSrv: Ingesting node '+nodename+' into graphdb ')
 
 
     fres = gndd_filedb_fileinfo_bynode(nodename,app.config["gnCfgDBFolder"])
 
     if not bool(fres):
-        print('GnAppSrv: Ingest node with: Invalid file ')
+        gn_log('GnAppSrv: Ingest node with: Invalid file ')
         rjson = {
             "status": "FAIL",
             "statusmsg": "Invalid node file ",
@@ -684,7 +692,7 @@ def  ingest_node_intodb():
     gndd_filedb_filestate_set(nodename, "INGESTED", app.config["gnCfgDBFolder"])
                             
     
-    gn_log('GnAppSrv: Uploaded new node. Remap metarepo ')
+    gn_log('GnAppSrv: uploaded new node. remap metarepo ')
     res = gngraph_search_client.gnsrch_meta_remap_request()
     
     rjson = {
@@ -694,13 +702,251 @@ def  ingest_node_intodb():
     }
     return rjson
 
+"""
+  API management routine 
+
+   We will use simple api-key to provide the access
+"""
+
+@app.route('/gnapi/v1/metanodes', methods=['GET'])
+def gnmetanodes_fetch_gnapi():
+
+    gn_log('GnAppSrv:  request received for meta nodes search')
+    if 'gnapikey' in request.args:
+        gnapikey = request.args['gnapikey']
+
+        if gnapikey != app.config["gn_api_key"]:
+            rjson = {
+                "status": "ERROR",
+                "errmsg": "Invalid API Key error"
+               }
+            gn_log('GnAppSrv:  API error')
+            return rjson   
+    else:
+        rjson = {
+            "status": "ERROR",
+            "errmsg": "Unauthorized access"
+            }
+        return rjson
+         
+    if 'db' in request.args:
+        db = request.args['db']
+    else:
+        db = ''
+
+    srchfilter = {}
+    if 'bizdomain' in request.args:
+        bizdomain = request.args['bizdomain']
+        srchfilter["bizdomain"] = bizdomain
+    else:
+        bizdomain = ''
+        
+    # Get srchstring and then pass to search func
+    if 'srchqry' in request.args:
+        srchqry_raw = request.args['srchqry']
+
+        # Remove "' begining and end
+        srchqry = dequote(srchqry_raw)
+        srchfilter["srchqry"] = srchqry
+        gn_log('GnAppSrv: search qry for metanodes : ' + srchqry)
+    else:
+        srchqry = ''
+
+    res = gngraph_search_client.gnsrch_metanodes_request(srchfilter)
+
+    gn_log('GnAppSrv:  metanode search  with filter   SUCCESS : ')
+    if (res["status"] == "SUCCESS"):
+        rjson = {
+           "status": "SUCCESS",
+           "gndata": res["data"]
+        }
+        
+    else:
+        rjson = {
+            "status": "ERROR",
+            "gndata": res["data"]
+            }
+              
+    return rjson
+
+
+@app.route('/gnapi/v1/metanodesattrs', methods=['GET'])
+def gnmetanodeattrs_fetch_gnapi():
+
+    print('GnAppSrv:  request received for metanodesattrs search')
+    if 'gnapikey' in request.args:
+        gnapikey = request.args['gnapikey']
+
+        if gnapikey != app.config["gn_api_key"]:
+            rjson = {
+                "status": "ERROR",
+                "errmsg": "Invalid API Key error"
+               }
+            gn_log('GnAppSrv:  API error')
+            return rjson   
+    else:
+        rjson = {
+            "status": "ERROR",
+            "errmsg": "Unauthorized access"
+            }
+        return rjson
+         
+    
+    # Get srchstring and then pass to search func
+    if 'srchqry' in request.args:
+        srchqry_raw = request.args['srchqry']
+
+        # Remove "' begining and end
+        srchqry = dequote(srchqry_raw)
+
+        print('GnAppSrv: search qry for metanodesattrs : ' + srchqry)
+    else:
+        srchqry = ''
+
+
+    srchfilter=""
+    res = gngraph_search_client.gnsrch_metanodesattrs_request()
+
+    print('GnAppSrv:  metanodeattrs search  with filter '+srchfilter+' '+res["status"])
+    print(res)
+    
+    if (res["status"] == "SUCCESS"):
+        rjson = {
+           "status": "SUCCESS",
+           "gndata": res["data"]
+        }
+        
+    else:
+        rjson = {
+            "status": "ERROR",
+            "gndata": []
+            }
+              
+    return rjson
+
+
+@app.route('/gnapi/v1/dblist', methods=['GET'])
+def   gnapi_fetch_dblist():
+
+    gn_log('GnAppSrv:  request received for databases list')
+    if 'gnapikey' in request.args:
+        gnapikey = request.args['gnapikey']
+
+        if gnapikey != app.config["gn_api_key"]:
+            rjson = {
+                "status": "ERROR",
+                "errmsg": "Invalid API Key error"
+               }
+            gn_log('GnAppSrv:  API error')
+            return rjson   
+    else:
+        rjson = {
+            "status": "ERROR",
+            "errmsg": "Unauthorized access"
+            }
+        return rjson
+         
+    
+    # Get srchstring and then pass to search func
+    if 'srchqry' in request.args:
+        srchqry_raw = request.args['srchqry']
+
+        # Remove "' begining and end
+        srchqry = dequote(srchqry_raw)
+
+        gn_log('GnAppSrv: search qry for metanodes : ' + srchqry)
+    else:
+        srchqry = ''
+
+    srchfilter=""
+    res = gn_cfg_gngraph_dblist(app.config["gnDBListCfg"])
+
+    gn_log('GnAppSrv:  get dblist with filter '+srchfilter+'  SUCCESS : ')
+    gn_log("GnAppSrv:  dblist returned ")
+    
+    if (len(res) == 0):        
+        rjson = {
+            "status": "ERROR",
+            "gndata": {}
+            }
+    else:
+        dblist = {}
+        dblist = {"dblist": res }
+        rjson = {
+           "status": "SUCCESS",
+           "gndata": dblist
+        }
+    gn_log("GnAppSrv: returning databases list  ")
+    return rjson
+
+
+
+@app.route('/gnapi/v1/bizdomlist', methods=['GET'])
+def   gnapi_fetch_bizdomain_list():
+
+    gn_log('GnAppSrv:  request received for databases list')
+    if 'gnapikey' in request.args:
+        gnapikey = request.args['gnapikey']
+
+        if gnapikey != app.config["gn_api_key"]:
+            rjson = {
+                "status": "ERROR",
+                "errmsg": "Invalid API Key error"
+               }
+            gn_log('GnAppSrv:  API error')
+            return rjson   
+    else:
+        rjson = {
+            "status": "ERROR",
+            "errmsg": "Unauthorized access"
+            }
+        return rjson
+         
+    
+    # Get srchstring and then pass to search func
+    if 'db' in request.args:
+        dbname = request.args['db']
+        gn_log('GnAppSrv: get bizdomains by db : ' + dbname)
+    else:
+        dbname = ''
+
+    srchfilter=""
+    
+    res =  gn_cfg_bizdomain_list_bydb(app.config["gndbBizDomListCfg"], dbname)
+
+    gn_log('GnAppSrv:  get bzdomlist with filter '+srchfilter+'  SUCCESS : ')
+    gn_log("GnAppSrv:  bzdomlist returned ")
+    
+    if (len(res) == 0):        
+        rjson = {
+            "status": "ERROR",
+            "gndata": {}
+            }
+    else:
+        bzdomlist = {}
+        bzdomlist = {"bizdomainlist": res }
+        rjson = {
+           "status": "SUCCESS",
+           "gndata": bzdomlist
+        }
+    gn_log("GnAppSrv: returning bizdomain list  ")
+    return rjson
+
+
+
+
+
 if __name__ == '__main__':
     
-    gn_log('GnAppSrv: Starting GnSearch thread ')
+    gn_log('GnAppSrv: starting search thread ')
     gngraph_search_client.__gn_graph_init(gnp_thread_flag, app.config["gnRootDir"])    
     
-    gn_log('GnAppSrv: Running Flask App ')
+    gn_log('GnAppSrv: running flask app ')
     if (gnp_thread_flag == 0):
         __gn_graph_init()
+
+    if (gnp_ingest_thread_flag == 1):
+        app.config["gningthr_config"] = gngraph_ingest_thread_setup(app.config["gnRootDir"])
+        
     app.run(host='0.0.0.0', port=5050, debug=True)
     gn_log('GnAppSrv:  Started Flask App ')
